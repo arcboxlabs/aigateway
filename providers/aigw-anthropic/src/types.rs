@@ -3,12 +3,14 @@
 //! These types map 1:1 to the Anthropic wire format.
 //! See <https://docs.anthropic.com/en/api/messages>
 
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 
 // ─── Request ─────────────────────────────────────────────────────────────────
 
 /// POST /v1/messages request body.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Builder, Serialize)]
+#[builder(on(String, into))]
 pub struct MessagesRequest {
     pub model: String,
     pub messages: Vec<Message>,
@@ -37,28 +39,8 @@ pub struct MessagesRequest {
 
     /// Provider-specific fields that we don't interpret.
     #[serde(flatten)]
+    #[builder(default)]
     pub extra: serde_json::Map<String, serde_json::Value>,
-}
-
-impl MessagesRequest {
-    pub fn new(model: impl Into<String>, messages: Vec<Message>, max_tokens: u64) -> Self {
-        Self {
-            model: model.into(),
-            messages,
-            max_tokens,
-            system: None,
-            temperature: None,
-            top_p: None,
-            top_k: None,
-            stop_sequences: None,
-            stream: None,
-            tools: None,
-            tool_choice: None,
-            metadata: None,
-            thinking: None,
-            extra: serde_json::Map::new(),
-        }
-    }
 }
 
 /// System prompt — can be a plain string or an array of text blocks.

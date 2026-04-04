@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use bon::Builder;
 use bytes::Bytes;
 use futures::StreamExt;
 use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
@@ -19,39 +20,18 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(600);
 /// Configuration for [`Client`].
 ///
 /// The API key is stored as [`SecretString`] and will never appear in Debug output or logs.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
+#[builder(on(String, into))]
 pub struct ClientConfig {
+    #[builder(into)]
     pub api_key: SecretString,
+    #[builder(default = DEFAULT_BASE_URL.to_owned())]
     pub base_url: String,
+    #[builder(default = DEFAULT_VERSION.to_owned())]
     pub version: String,
     /// Request timeout. Defaults to 600s (10 min) to accommodate long-running completions.
+    #[builder(default = DEFAULT_TIMEOUT)]
     pub timeout: Duration,
-}
-
-impl ClientConfig {
-    pub fn new(api_key: impl Into<String>) -> Self {
-        Self {
-            api_key: SecretString::from(api_key.into()),
-            base_url: DEFAULT_BASE_URL.to_owned(),
-            version: DEFAULT_VERSION.to_owned(),
-            timeout: DEFAULT_TIMEOUT,
-        }
-    }
-
-    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
-        self.base_url = base_url.into();
-        self
-    }
-
-    pub fn with_version(mut self, version: impl Into<String>) -> Self {
-        self.version = version.into();
-        self
-    }
-
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = timeout;
-        self
-    }
 }
 
 /// Anthropic API client.
@@ -99,7 +79,7 @@ impl Client {
     pub fn from_env() -> Result<Self, Error> {
         let api_key =
             std::env::var("ANTHROPIC_API_KEY").map_err(|e| Error::Config(e.to_string()))?;
-        Self::new(ClientConfig::new(api_key))
+        Self::new(ClientConfig::builder().api_key(api_key).build())
     }
 
     /// Send a non-streaming messages request.
