@@ -140,6 +140,7 @@ pub enum OpenAICompatConfigError {
     MissingBaseUrl,
     MissingApiKey,
     InvalidBaseUrl(String),
+    InvalidTimeoutSeconds(u64),
 }
 
 impl From<OpenAITransportConfigError> for OpenAICompatConfigError {
@@ -148,6 +149,9 @@ impl From<OpenAITransportConfigError> for OpenAICompatConfigError {
             OpenAITransportConfigError::MissingBaseUrl => Self::MissingBaseUrl,
             OpenAITransportConfigError::MissingApiKey => Self::MissingApiKey,
             OpenAITransportConfigError::InvalidBaseUrl(base_url) => Self::InvalidBaseUrl(base_url),
+            OpenAITransportConfigError::InvalidTimeoutSeconds(timeout_seconds) => {
+                Self::InvalidTimeoutSeconds(timeout_seconds)
+            }
         }
     }
 }
@@ -160,6 +164,12 @@ impl Display for OpenAICompatConfigError {
             Self::MissingApiKey => f.write_str("openai-compat api_key is required"),
             Self::InvalidBaseUrl(base_url) => {
                 write!(f, "openai-compat base_url is invalid: {base_url}")
+            }
+            Self::InvalidTimeoutSeconds(timeout_seconds) => {
+                write!(
+                    f,
+                    "openai-compat timeout_seconds must be greater than zero: {timeout_seconds}"
+                )
             }
         }
     }
@@ -178,6 +188,7 @@ mod tests {
             name: "groq".to_owned(),
             http: HttpTransportConfig {
                 base_url: "https://api.groq.com/openai/v1/".to_owned(),
+                timeout_seconds: 30,
                 default_headers: BTreeMap::new(),
             },
             auth: OpenAIAuthConfig {
@@ -209,6 +220,15 @@ mod tests {
             err,
             OpenAICompatConfigError::InvalidBaseUrl("api.groq.com/openai/v1".to_owned())
         );
+    }
+
+    #[test]
+    fn new_rejects_zero_timeout() {
+        let mut config = config();
+        config.http.timeout_seconds = 0;
+
+        let err = OpenAICompatProvider::new(config).expect_err("provider should be invalid");
+        assert_eq!(err, OpenAICompatConfigError::InvalidTimeoutSeconds(0));
     }
 
     #[test]

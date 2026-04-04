@@ -5,11 +5,14 @@ use std::fmt::{self, Debug, Display, Formatter};
 use serde::Deserialize;
 
 pub const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
+pub const DEFAULT_TIMEOUT_SECONDS: u64 = 600;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct HttpTransportConfig {
     #[serde(default = "default_openai_base_url")]
     pub base_url: String,
+    #[serde(default = "default_timeout_seconds")]
+    pub timeout_seconds: u64,
     #[serde(default)]
     pub default_headers: BTreeMap<String, String>,
 }
@@ -25,6 +28,12 @@ impl HttpTransportConfig {
         if !(self.base_url.starts_with("http://") || self.base_url.starts_with("https://")) {
             return Err(OpenAITransportConfigError::InvalidBaseUrl(
                 self.base_url.clone(),
+            ));
+        }
+
+        if self.timeout_seconds == 0 {
+            return Err(OpenAITransportConfigError::InvalidTimeoutSeconds(
+                self.timeout_seconds,
             ));
         }
 
@@ -100,12 +109,17 @@ impl OpenAITransportConfig {
     pub fn default_headers(&self) -> &BTreeMap<String, String> {
         &self.http.default_headers
     }
+
+    pub fn timeout_seconds(&self) -> u64 {
+        self.http.timeout_seconds
+    }
 }
 
 impl Debug for OpenAITransportConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("OpenAITransportConfig")
             .field("base_url", &self.http.base_url)
+            .field("timeout_seconds", &self.http.timeout_seconds)
             .field("api_key", &"[REDACTED]")
             .field("organization", &self.auth.organization)
             .field("project", &self.auth.project)
@@ -143,6 +157,10 @@ impl OpenAITransport {
 
     pub fn default_headers(&self) -> &BTreeMap<String, String> {
         self.config.default_headers()
+    }
+
+    pub fn timeout_seconds(&self) -> u64 {
+        self.config.timeout_seconds()
     }
 
     pub fn prepare_request(
@@ -211,6 +229,7 @@ pub enum OpenAITransportConfigError {
     MissingBaseUrl,
     MissingApiKey,
     InvalidBaseUrl(String),
+    InvalidTimeoutSeconds(u64),
 }
 
 impl Display for OpenAITransportConfigError {
@@ -221,6 +240,12 @@ impl Display for OpenAITransportConfigError {
             Self::InvalidBaseUrl(base_url) => {
                 write!(f, "openai transport base_url is invalid: {base_url}")
             }
+            Self::InvalidTimeoutSeconds(timeout_seconds) => {
+                write!(
+                    f,
+                    "openai transport timeout_seconds must be greater than zero: {timeout_seconds}"
+                )
+            }
         }
     }
 }
@@ -229,6 +254,10 @@ impl Error for OpenAITransportConfigError {}
 
 fn default_openai_base_url() -> String {
     DEFAULT_OPENAI_BASE_URL.to_owned()
+}
+
+fn default_timeout_seconds() -> u64 {
+    DEFAULT_TIMEOUT_SECONDS
 }
 
 fn normalize_optional_field(value: String) -> Option<String> {
@@ -252,8 +281,8 @@ fn join_url(base_url: &str, path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        DEFAULT_OPENAI_BASE_URL, HttpTransportConfig, OpenAIAuthConfig, OpenAITransport,
-        OpenAITransportConfig,
+        DEFAULT_OPENAI_BASE_URL, DEFAULT_TIMEOUT_SECONDS, HttpTransportConfig, OpenAIAuthConfig,
+        OpenAITransport, OpenAITransportConfig,
     };
     use std::collections::BTreeMap;
 
@@ -261,6 +290,7 @@ mod tests {
         OpenAITransportConfig {
             http: HttpTransportConfig {
                 base_url: " https://api.openai.com/v1/ ".to_owned(),
+                timeout_seconds: 30,
                 default_headers: BTreeMap::from([("X-Default".to_owned(), "default".to_owned())]),
             },
             auth: OpenAIAuthConfig {
@@ -280,6 +310,7 @@ mod tests {
         let config: OpenAITransportConfig = serde_json::from_str(json).unwrap();
         let transport = OpenAITransport::new(config).unwrap();
         assert_eq!(transport.base_url(), DEFAULT_OPENAI_BASE_URL);
+        assert_eq!(transport.timeout_seconds(), DEFAULT_TIMEOUT_SECONDS);
     }
 
     #[test]
@@ -362,6 +393,18 @@ mod tests {
         assert_eq!(
             request.headers.get("OpenAI-Project"),
             Some(&"proj_456".to_owned())
+        );
+    }
+
+    #[test]
+    fn new_rejects_zero_timeout() {
+        let mut config = config();
+        config.http.timeout_seconds = 0;
+
+        let err = OpenAITransport::new(config).unwrap_err();
+        assert_eq!(
+            err,
+            super::OpenAITransportConfigError::InvalidTimeoutSeconds(0)
         );
     }
 }

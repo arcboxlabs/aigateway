@@ -3,7 +3,6 @@
 use std::time::Duration;
 
 use bon::Builder;
-use bytes::Bytes;
 use futures::StreamExt;
 use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
 use secrecy::{ExposeSecret, SecretString};
@@ -118,7 +117,7 @@ impl Client {
         }
 
         let byte_stream = response.bytes_stream().map(|result| {
-            result.map(Bytes::from).map_err(|e| {
+            result.map_err(|e| {
                 std::io::Error::new(std::io::ErrorKind::ConnectionReset, e.to_string())
             })
         });

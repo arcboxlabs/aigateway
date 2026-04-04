@@ -72,7 +72,9 @@ impl Error for OpenAIApiError {}
 #[derive(Debug, Error)]
 pub enum OpenAIError {
     #[error(transparent)]
-    Api(#[from] OpenAIApiError),
+    Api(#[from] Box<OpenAIApiError>),
+    #[error("invalid request shape: {0}")]
+    InvalidRequestShape(String),
     #[error("invalid header `{name}` with value `{value}`")]
     InvalidHeader { name: String, value: String },
     #[error("connection error: {0}")]

@@ -1,4 +1,5 @@
 use std::pin::Pin;
+use std::time::Duration;
 
 use futures_core::Stream;
 use futures_util::StreamExt;
@@ -12,11 +13,15 @@ use crate::sse::parse_openai_sse;
 use crate::transport::{OpenAITransport, OpenAITransportConfig, OpenAITransportConfigError};
 use crate::wire_types::{
     ApiErrorResponse, ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, Model,
-    ModelListResponse,
+    ModelListResponse, ResponseCompactRequest, ResponseCompaction, ResponseCreateRequest,
+    ResponseInputItemsPage, ResponseInputTokensRequest, ResponseInputTokensResponse,
+    ResponseObject, ResponseRetrieveStreamQuery, ResponseStreamEvent,
 };
 
 pub type OpenAIChatCompletionStream =
     Pin<Box<dyn Stream<Item = Result<ChatCompletionChunk, OpenAIError>> + Send>>;
+pub type OpenAIResponseStream =
+    Pin<Box<dyn Stream<Item = Result<ResponseStreamEvent, OpenAIError>> + Send>>;
 
 #[derive(Clone, Debug)]
 pub struct OpenAIClient {
@@ -51,6 +56,33 @@ impl OpenAIClient {
         self.post_json("/chat/completions", request).await
     }
 
+    pub async fn create_response(
+        &self,
+        request: &ResponseCreateRequest,
+    ) -> Result<ResponseObject, OpenAIError> {
+        request
+            .validate()
+            .map_err(|error| OpenAIError::InvalidRequestShape(error.to_string()))?;
+        self.post_json("/responses", request).await
+    }
+
+    pub async fn count_response_input_tokens(
+        &self,
+        request: &ResponseInputTokensRequest,
+    ) -> Result<ResponseInputTokensResponse, OpenAIError> {
+        request
+            .validate()
+            .map_err(|error| OpenAIError::InvalidRequestShape(error.to_string()))?;
+        self.post_json("/responses/input_tokens", request).await
+    }
+
+    pub async fn compact_response(
+        &self,
+        request: &ResponseCompactRequest,
+    ) -> Result<ResponseCompaction, OpenAIError> {
+        self.post_json("/responses/compact", request).await
+    }
+
     pub async fn stream_chat_completion(
         &self,
         request: &ChatCompletionRequest,
@@ -67,12 +99,75 @@ impl OpenAIClient {
         Ok(Box::pin(stream))
     }
 
+    pub async fn stream_response(
+        &self,
+        request: &ResponseCreateRequest,
+    ) -> Result<OpenAIResponseStream, OpenAIError> {
+        request
+            .validate()
+            .map_err(|error| OpenAIError::InvalidRequestShape(error.to_string()))?;
+
+        let mut streamed_request = request.clone();
+        streamed_request.stream = Some(true);
+
+        let response = self
+            .post_json_response_with_headers(
+                "/responses",
+                &streamed_request,
+                &HeaderMapSpec::sse_accept(),
+            )
+            .await?;
+        let stream = parse_openai_sse::<_, _, _, ResponseStreamEvent>(response.bytes_stream())
+            .map(|item| item.map_err(OpenAIError::from));
+
+        Ok(Box::pin(stream))
+    }
+
     pub async fn list_models(&self) -> Result<ModelListResponse, OpenAIError> {
         self.get_json("/models").await
     }
 
     pub async fn get_model(&self, model: &str) -> Result<Model, OpenAIError> {
         self.get_json(&format!("/models/{model}")).await
+    }
+
+    pub async fn get_response(&self, response_id: &str) -> Result<ResponseObject, OpenAIError> {
+        self.get_json(&format!("/responses/{response_id}")).await
+    }
+
+    pub async fn cancel_response(&self, response_id: &str) -> Result<ResponseObject, OpenAIError> {
+        self.post_json_without_body(&format!("/responses/{response_id}/cancel"))
+            .await
+    }
+
+    pub async fn list_response_input_items(
+        &self,
+        response_id: &str,
+    ) -> Result<ResponseInputItemsPage, OpenAIError> {
+        self.get_json(&format!("/responses/{response_id}/input_items"))
+            .await
+    }
+
+    pub async fn retrieve_response_stream(
+        &self,
+        response_id: &str,
+        starting_after: Option<&str>,
+    ) -> Result<OpenAIResponseStream, OpenAIError> {
+        let query = ResponseRetrieveStreamQuery {
+            stream: true,
+            starting_after: starting_after.map(str::to_owned),
+        };
+
+        let prepared = self.transport.prepare_request(
+            &format!("/responses/{response_id}"),
+            &HeaderMapSpec::sse_accept(),
+        );
+        let request = self.request_builder(Method::GET, prepared)?.query(&query);
+        let response = self.execute(request).await?;
+        let stream = parse_openai_sse::<_, _, _, ResponseStreamEvent>(response.bytes_stream())
+            .map(|item| item.map_err(OpenAIError::from));
+
+        Ok(Box::pin(stream))
     }
 
     async fn get_json<T>(&self, path: &str) -> Result<T, OpenAIError>
@@ -92,7 +187,9 @@ impl OpenAIClient {
         T: DeserializeOwned,
         B: Serialize + ?Sized,
     {
-        let response = self.post_json_response(path, body).await?;
+        let response = self
+            .post_json_response_with_headers(path, body, &HeaderMapSpec::empty())
+            .await?;
         self.decode_json(response).await
     }
 
@@ -100,11 +197,34 @@ impl OpenAIClient {
     where
         B: Serialize + ?Sized,
     {
+        self.post_json_response_with_headers(path, body, &HeaderMapSpec::empty())
+            .await
+    }
+
+    async fn post_json_response_with_headers<B>(
+        &self,
+        path: &str,
+        body: &B,
+        extra_headers: &std::collections::BTreeMap<String, String>,
+    ) -> Result<Response, OpenAIError>
+    where
+        B: Serialize + ?Sized,
+    {
+        let prepared = self.transport.prepare_json_request(path, extra_headers);
+        let request = self.request_builder(Method::POST, prepared)?.json(body);
+        self.execute(request).await
+    }
+
+    async fn post_json_without_body<T>(&self, path: &str) -> Result<T, OpenAIError>
+    where
+        T: DeserializeOwned,
+    {
         let prepared = self
             .transport
             .prepare_json_request(path, &HeaderMapSpec::empty());
-        let request = self.request_builder(Method::POST, prepared)?.json(body);
-        self.execute(request).await
+        let request = self.request_builder(Method::POST, prepared)?;
+        let response = self.execute(request).await?;
+        self.decode_json(response).await
     }
 
     fn request_builder(
@@ -115,6 +235,7 @@ impl OpenAIClient {
         Ok(self
             .http
             .request(method, prepared.url)
+            .timeout(Duration::from_secs(self.transport.timeout_seconds()))
             .headers(build_header_map(&prepared.headers)?))
     }
 
@@ -186,7 +307,7 @@ async fn api_error_from_response(response: Response) -> OpenAIError {
             Err(_) => (body.clone(), None, None, None),
         };
 
-    OpenAIError::Api(OpenAIApiError {
+    OpenAIError::Api(Box::new(OpenAIApiError {
         kind: OpenAIApiErrorKind::from_status(status),
         status,
         message,
@@ -195,7 +316,7 @@ async fn api_error_from_response(response: Response) -> OpenAIError {
         code,
         request_id,
         body,
-    })
+    }))
 }
 
 struct HeaderMapSpec;
@@ -207,6 +328,10 @@ impl HeaderMapSpec {
 
     fn json_accept_only() -> std::collections::BTreeMap<String, String> {
         std::collections::BTreeMap::from([("Accept".to_owned(), "application/json".to_owned())])
+    }
+
+    fn sse_accept() -> std::collections::BTreeMap<String, String> {
+        std::collections::BTreeMap::from([("Accept".to_owned(), "text/event-stream".to_owned())])
     }
 }
 
@@ -224,12 +349,15 @@ mod tests {
     use crate::transport::{HttpTransportConfig, OpenAIAuthConfig, OpenAITransportConfig};
     use crate::wire_types::{
         ChatCompletionRequest, ChatMessage, ChatMessageContent, ChatMessageRole,
+        ResponseCompactRequest, ResponseCreateRequest, ResponseInputItemsPage,
+        ResponseInputTokensRequest,
     };
 
     fn config(base_url: String) -> OpenAITransportConfig {
         OpenAITransportConfig {
             http: HttpTransportConfig {
                 base_url,
+                timeout_seconds: 30,
                 default_headers: BTreeMap::from([("X-Default".to_owned(), "default".to_owned())]),
             },
             auth: OpenAIAuthConfig {
@@ -342,11 +470,241 @@ mod tests {
         match error {
             OpenAIError::Api(error) => {
                 assert_eq!(error.kind, OpenAIApiErrorKind::Authentication);
-                assert_eq!(error.status, 401);
+                assert_eq!(error.status, 401u16);
                 assert_eq!(error.message, "invalid api key");
             }
             other => panic!("unexpected error: {other}"),
         }
+    }
+
+    #[tokio::test]
+    async fn create_response_posts_json_and_decodes_body() {
+        let body = r#"{
+            "id":"resp_123",
+            "object":"response",
+            "created_at":1,
+            "status":"completed",
+            "model":"gpt-4.1",
+            "output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"hello"}]}],
+            "usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}
+        }"#;
+        let (base_url, request_rx) =
+            spawn_server(http_response("200 OK", "application/json", body)).await;
+        let client = OpenAIClient::new(config(base_url)).unwrap();
+        let request = response_request();
+
+        let response = client.create_response(&request).await.unwrap();
+        assert_eq!(response.id, "resp_123");
+        assert_eq!(response.status.as_deref(), Some("completed"));
+
+        let request = request_rx.await.unwrap().to_lowercase();
+        assert!(request.contains("post /v1/responses http/1.1"));
+        assert!(request.contains("\"model\":\"gpt-4.1\""));
+        assert!(request.contains("\"input\":\"hello\""));
+    }
+
+    #[tokio::test]
+    async fn stream_response_parses_raw_response_events() {
+        let body = concat!(
+            "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"created_at\":1}}\n\n",
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"hel\",\"obfuscation\":\"xx\"}\n\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"status\":\"completed\"}}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let (base_url, request_rx) =
+            spawn_server(http_response("200 OK", "text/event-stream", body)).await;
+        let client = OpenAIClient::new(config(base_url)).unwrap();
+
+        let events = client
+            .stream_response(&response_request())
+            .await
+            .unwrap()
+            .collect::<Vec<_>>()
+            .await;
+
+        assert_eq!(events.len(), 3);
+        assert_eq!(
+            events[1].as_ref().unwrap().event_type,
+            "response.output_text.delta"
+        );
+        assert_eq!(events[1].as_ref().unwrap().extra["delta"], "hel");
+        assert_eq!(events[1].as_ref().unwrap().extra["obfuscation"], "xx");
+
+        let request = request_rx.await.unwrap().to_lowercase();
+        assert!(request.contains("accept: text/event-stream"));
+        assert!(request.contains("\"stream\":true"));
+    }
+
+    #[tokio::test]
+    async fn retrieve_response_stream_sends_stream_query() {
+        let body = concat!(
+            "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"created_at\":1}}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let (base_url, request_rx) =
+            spawn_server(http_response("200 OK", "text/event-stream", body)).await;
+        let client = OpenAIClient::new(config(base_url)).unwrap();
+
+        let events = client
+            .retrieve_response_stream("resp_123", Some("evt_9"))
+            .await
+            .unwrap()
+            .collect::<Vec<_>>()
+            .await;
+
+        assert_eq!(events.len(), 1);
+
+        let request = request_rx.await.unwrap().to_lowercase();
+        assert!(
+            request
+                .contains("get /v1/responses/resp_123?stream=true&starting_after=evt_9 http/1.1")
+        );
+    }
+
+    #[tokio::test]
+    async fn list_response_input_items_decodes_page() {
+        let body = r#"{
+            "object":"list",
+            "data":[{"type":"message","role":"user","content":"hello"}],
+            "first_id":"item_1",
+            "last_id":"item_1",
+            "has_more":false
+        }"#;
+        let (base_url, request_rx) =
+            spawn_server(http_response("200 OK", "application/json", body)).await;
+        let client = OpenAIClient::new(config(base_url)).unwrap();
+
+        let page: ResponseInputItemsPage =
+            client.list_response_input_items("resp_123").await.unwrap();
+        assert_eq!(page.data.len(), 1);
+        assert_eq!(page.first_id.as_deref(), Some("item_1"));
+
+        let request = request_rx.await.unwrap().to_lowercase();
+        assert!(request.contains("get /v1/responses/resp_123/input_items http/1.1"));
+    }
+
+    #[tokio::test]
+    async fn cancel_response_posts_without_body() {
+        let body = r#"{
+            "id":"resp_123",
+            "object":"response",
+            "status":"cancelled"
+        }"#;
+        let (base_url, request_rx) =
+            spawn_server(http_response("200 OK", "application/json", body)).await;
+        let client = OpenAIClient::new(config(base_url)).unwrap();
+
+        let response = client.cancel_response("resp_123").await.unwrap();
+        assert_eq!(response.status.as_deref(), Some("cancelled"));
+
+        let request = request_rx.await.unwrap().to_lowercase();
+        assert!(request.contains("post /v1/responses/resp_123/cancel http/1.1"));
+    }
+
+    #[tokio::test]
+    async fn create_response_rejects_invalid_shape_locally() {
+        let client = OpenAIClient::new(config("http://127.0.0.1:1/v1".to_owned())).unwrap();
+        let mut request = response_request();
+        request.conversation = Some(serde_json::json!({"id":"conv_1"}));
+        request.previous_response_id = Some("resp_prev".to_owned());
+
+        let error = client.create_response(&request).await.unwrap_err();
+        match error {
+            OpenAIError::InvalidRequestShape(message) => {
+                assert!(message.contains("previous_response_id"));
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn count_response_input_tokens_posts_request() {
+        let body = r#"{
+            "object":"response.input_tokens",
+            "input_tokens":139
+        }"#;
+        let (base_url, request_rx) =
+            spawn_server(http_response("200 OK", "application/json", body)).await;
+        let client = OpenAIClient::new(config(base_url)).unwrap();
+
+        let response = client
+            .count_response_input_tokens(&input_tokens_request())
+            .await
+            .unwrap();
+        assert_eq!(response.input_tokens, Some(139));
+
+        let request = request_rx.await.unwrap().to_lowercase();
+        assert!(request.contains("post /v1/responses/input_tokens http/1.1"));
+        assert!(request.contains("\"model\":\"gpt-4.1\""));
+        assert!(request.contains("\"input\":\"hello\""));
+    }
+
+    #[tokio::test]
+    async fn compact_response_posts_request() {
+        let body = r#"{
+            "id":"resp_001",
+            "object":"response.compaction",
+            "created_at":1764967971,
+            "output":[
+                {"id":"msg_000","type":"message","status":"completed","content":[{"type":"input_text","text":"Create a simple landing page."}],"role":"user"},
+                {"id":"cmp_001","type":"compaction","encrypted_content":"gAAAAABpM0Yj-...="}
+            ],
+            "usage":{"input_tokens":139,"output_tokens":438,"total_tokens":577}
+        }"#;
+        let (base_url, request_rx) =
+            spawn_server(http_response("200 OK", "application/json", body)).await;
+        let client = OpenAIClient::new(config(base_url)).unwrap();
+
+        let response = client.compact_response(&compact_request()).await.unwrap();
+        assert_eq!(response.object, "response.compaction");
+        assert_eq!(response.output.as_ref().unwrap().len(), 2);
+
+        let request = request_rx.await.unwrap().to_lowercase();
+        assert!(request.contains("post /v1/responses/compact http/1.1"));
+        assert!(request.contains("\"model\":\"gpt-5.1-codex-max\""));
+    }
+
+    fn response_request() -> ResponseCreateRequest {
+        let mut request = ResponseCreateRequest::new("gpt-4.1");
+        request.input = Some(serde_json::json!("hello"));
+        request.max_output_tokens = Some(64);
+        request.parallel_tool_calls = Some(true);
+        request.safety_identifier = Some("user-123".to_owned());
+        request.store = Some(false);
+        request.temperature = Some(0.7);
+        request
+    }
+
+    fn input_tokens_request() -> ResponseInputTokensRequest {
+        let mut request = ResponseInputTokensRequest::new("gpt-4.1");
+        request.input = Some(serde_json::json!("hello"));
+        request.parallel_tool_calls = Some(true);
+        request
+    }
+
+    fn compact_request() -> ResponseCompactRequest {
+        let mut request = ResponseCompactRequest::new("gpt-5.1-codex-max");
+        request.input = Some(serde_json::json!([
+            {
+                "role": "user",
+                "content": "Create a simple landing page for a dog petting cafe."
+            },
+            {
+                "id": "msg_001",
+                "type": "message",
+                "status": "completed",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "annotations": [],
+                        "logprobs": [],
+                        "text": "Below is a single file, ready-to-use landing page..."
+                    }
+                ],
+                "role": "assistant"
+            }
+        ]));
+        request
     }
 
     async fn spawn_server(response: String) -> (String, oneshot::Receiver<String>) {
@@ -379,18 +737,19 @@ mod tests {
 
             buffer.extend_from_slice(&chunk[..read]);
 
-            if header_end.is_none() {
-                if let Some(position) = buffer.windows(4).position(|window| window == b"\r\n\r\n") {
-                    header_end = Some(position + 4);
-                    let headers = String::from_utf8_lossy(&buffer[..position + 4]);
-                    content_length = parse_content_length(&headers);
-                }
+            if header_end.is_none()
+                && let Some(position) =
+                    buffer.windows(4).position(|window| window == b"\r\n\r\n")
+            {
+                header_end = Some(position + 4);
+                let headers = String::from_utf8_lossy(&buffer[..position + 4]);
+                content_length = parse_content_length(&headers);
             }
 
-            if let Some(end) = header_end {
-                if buffer.len() >= end + content_length {
-                    break;
-                }
+            if let Some(end) = header_end
+                && buffer.len() >= end + content_length
+            {
+                break;
             }
         }
 

@@ -1,6 +1,7 @@
 pub mod chat;
 pub mod embeddings;
 pub mod models;
+pub mod responses;
 pub mod shared;
 
 pub use chat::{
@@ -15,4 +16,12 @@ pub use embeddings::{
     Embedding, EmbeddingInput, EmbeddingRequest, EmbeddingResponse, EmbeddingUsage,
 };
 pub use models::{Model, ModelListResponse};
+pub use responses::{
+    ResponseCompactRequest, ResponseCompaction, ResponseContentPart, ResponseContextManagement,
+    ResponseConversation, ResponseCreateRequest, ResponseCreateRequestError, ResponseInput,
+    ResponseInputItem, ResponseInputItemsPage, ResponseInputTokensRequest,
+    ResponseInputTokensResponse, ResponseObject, ResponseOutputItem, ResponsePromptCacheRetention,
+    ResponseReasoning, ResponseRetrieveStreamQuery, ResponseStreamEvent, ResponseStreamOptions,
+    ResponseTextConfig, ResponseTool, ResponseToolChoice, ResponseUsage,
+};
 pub use shared::{ApiErrorBody, ApiErrorResponse, JsonObject, OneOrMany, json_object_is_empty};
