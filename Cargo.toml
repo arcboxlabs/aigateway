@@ -1,0 +1,22 @@
+[workspace]
+members = [
+    "providers/aigw-openai",
+    "providers/aigw-openai-compat",
+    "providers/aigw-anthropic",
+    "providers/aigw-gemini",
+]
+resolver = "3"
+
+[package]
+name = "aigateway"
+version = "0.0.1"
+edition = "2024"
+description = "A unified AI Gateway for multiple LLM providers"
+license = "MIT"
+repository = "https://github.com/AprilNEA/aigateway"
+
+[dependencies]
+aigw-openai = { version = "0.0.1", path = "providers/aigw-openai" }
+aigw-openai-compat = { version = "0.0.1", path = "providers/aigw-openai-compat" }
+aigw-anthropic = { version = "0.0.1", path = "providers/aigw-anthropic" }
+aigw-gemini = { version = "0.0.1", path = "providers/aigw-gemini" }

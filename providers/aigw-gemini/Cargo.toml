@@ -1,0 +1,9 @@
+[package]
+name = "aigw-gemini"
+version = "0.0.1"
+edition = "2024"
+description = "Google Gemini provider for AI Gateway"
+license = "MIT"
+repository = "https://github.com/AprilNEA/aigateway"
+
+[dependencies]
