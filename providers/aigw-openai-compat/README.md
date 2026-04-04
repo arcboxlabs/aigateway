@@ -1,10 +1,10 @@
 # aigw-openai-compat
 
-## 目标
+## Goal
 
-`aigw-openai-compat` 用来承接“兼容 OpenAI API 形状，但并非 OpenAI 官方”的 provider。
+`aigw-openai-compat` handles providers that are "OpenAI API-shaped but not officially OpenAI."
 
-典型对象：
+Typical targets:
 
 - vLLM
 - Together AI
@@ -13,41 +13,41 @@
 - Perplexity
 - LM Studio
 
-这些 provider 大多复用了 OpenAI 风格的路径、JSON 结构和 SSE 格式，但通常存在差异：
+These providers largely reuse OpenAI-style paths, JSON structures, and SSE formats, but usually diverge in some ways:
 
-- `base_url` 不同
-- 支持的 endpoint 子集不同
-- `Responses API` 往往不完整甚至没有
-- `tools`、`tool_choice`、`vision`、`parallel_tool_calls` 支持度不同
-- 某些字段虽然接受，但会静默忽略
+- Different `base_url`
+- Different supported endpoint subsets
+- `Responses API` is often incomplete or absent
+- Varying support for `tools`, `tool_choice`, `vision`, `parallel_tool_calls`
+- Some fields are accepted but silently ignored
 
-所以这里不应该复用 `aigw-openai` 作为“第三方兼容总线”，而应单独做一个可配置 compat 层。
+Therefore, instead of repurposing `aigw-openai` as a "third-party compatibility bus," we maintain a separate configurable compat layer.
 
-## 职责边界
+## Responsibility Boundaries
 
 - `aigw-openai`
-  - 只负责 OpenAI 官方标准
-  - 目标是最大限度协议忠实
+  - Covers only the official OpenAI standard
+  - Goal: maximum protocol fidelity
 - `aigw-openai-compat`
-  - 负责 OpenAI-compatible 生态
-  - 允许通过 `quirks` 描述第三方差异
-  - 默认只承诺“OpenAI-shaped”，不承诺“OpenAI-identical”
+  - Covers the OpenAI-compatible ecosystem
+  - Uses `quirks` to describe per-provider differences
+  - Promises "OpenAI-shaped," not "OpenAI-identical"
 
-## 当前骨架
+## Current Skeleton
 
-目前先落最小配置模型：
+The minimal configuration model so far:
 
 - `OpenAICompatProvider`
 - `OpenAICompatConfig`
 - `Quirks`
 - `OpenAICompatConfigError`
 
-后续实现建议：
+Roadmap suggestions:
 
-1. 抽一个共享 HTTP/SSE transport 层给 `aigw-openai` 和 `aigw-openai-compat` 共用。
-2. `compat` 层优先支持：
+1. Extract a shared HTTP/SSE transport layer for `aigw-openai` and `aigw-openai-compat` to share.
+2. The compat layer should prioritize support for:
    - `chat/completions`
    - `embeddings`
-   - 常见流式 chat SSE
-3. `Responses API` 支持放到能力探测或 provider preset 里，不要默认假设存在。
-4. 所有 provider 特性差异都经由 `quirks` 或 capability matrix 表达，不要把 Groq/Together/vLLM 的分支硬编码进官方 OpenAI crate。
+   - Common streaming chat SSE
+3. `Responses API` support should be gated behind capability detection or provider presets — do not assume it exists by default.
+4. All provider-specific differences should be expressed through `quirks` or a capability matrix. Do not hardcode Groq/Together/vLLM branches into the official OpenAI crate.
