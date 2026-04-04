@@ -13,7 +13,7 @@ version = "0.0.1"
 edition = "2024"
 description = "A unified AI Gateway for multiple LLM providers"
 license = "MIT"
-repository = "https://github.com/AprilNEA/aigateway"
+repository = "https://github.com/arcboxlabs/aigateway"
 
 [dependencies]
 aigw-openai = { version = "0.0.1", path = "providers/aigw-openai" }
