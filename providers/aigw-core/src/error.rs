@@ -98,11 +98,7 @@ pub enum ProviderError {
 /// - `status`: HTTP status code
 /// - `headers`: response headers (used to extract `retry-after` for 429)
 /// - `message`: error message already extracted from the provider's error body
-pub fn map_error_status(
-    status: u16,
-    headers: &http::HeaderMap,
-    message: String,
-) -> ProviderError {
+pub fn map_error_status(status: u16, headers: &http::HeaderMap, message: String) -> ProviderError {
     match status {
         401 => ProviderError::AuthenticationFailed { message },
         403 => ProviderError::PermissionDenied { message },

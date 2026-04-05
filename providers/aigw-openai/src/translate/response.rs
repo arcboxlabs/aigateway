@@ -52,9 +52,9 @@ impl ResponseTranslator for OpenAIResponseTranslator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
     use aigw_core::model::FinishReason;
     use aigw_core::translate::ResponseTranslator;
+    use std::time::Duration;
 
     #[test]
     fn translate_minimal_response() {
@@ -86,10 +86,7 @@ mod tests {
         assert_eq!(resp.id, "chatcmpl-abc");
         assert_eq!(resp.model, "gpt-4.1");
         assert_eq!(resp.choices.len(), 1);
-        assert_eq!(
-            resp.choices[0].finish_reason,
-            Some(FinishReason::Stop)
-        );
+        assert_eq!(resp.choices[0].finish_reason, Some(FinishReason::Stop));
         let usage = resp.usage.as_ref().unwrap();
         assert_eq!(usage.prompt_tokens, Some(10));
         assert_eq!(usage.completion_tokens, Some(5));
@@ -168,11 +165,8 @@ mod tests {
         headers.insert("retry-after", "30".parse().unwrap());
 
         let translator = OpenAIResponseTranslator;
-        let err = translator.translate_error(
-            StatusCode::TOO_MANY_REQUESTS,
-            &headers,
-            body.as_bytes(),
-        );
+        let err =
+            translator.translate_error(StatusCode::TOO_MANY_REQUESTS, &headers, body.as_bytes());
 
         match err {
             ProviderError::RateLimited {
@@ -191,8 +185,11 @@ mod tests {
         let body = r#"{"error":{"message":"Invalid API key","type":"authentication_error"}}"#;
 
         let translator = OpenAIResponseTranslator;
-        let err =
-            translator.translate_error(StatusCode::UNAUTHORIZED, &HeaderMap::new(), body.as_bytes());
+        let err = translator.translate_error(
+            StatusCode::UNAUTHORIZED,
+            &HeaderMap::new(),
+            body.as_bytes(),
+        );
 
         assert!(matches!(err, ProviderError::AuthenticationFailed { .. }));
     }

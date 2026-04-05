@@ -309,9 +309,10 @@ impl OpenAIClient {
     where
         T: DeserializeOwned,
     {
-        let prepared = self
-            .transport
-            .prepare_request(path, &BTreeMap::from([("Accept".to_owned(), "application/json".to_owned())]));
+        let prepared = self.transport.prepare_request(
+            path,
+            &BTreeMap::from([("Accept".to_owned(), "application/json".to_owned())]),
+        );
         let request = self.request_builder(Method::GET, prepared)?;
         let response = self.execute(request).await?;
         self.decode_json(response).await
@@ -335,9 +336,7 @@ impl OpenAIClient {
     where
         T: DeserializeOwned,
     {
-        let prepared = self
-            .transport
-            .prepare_json_request(path, &BTreeMap::new());
+        let prepared = self.transport.prepare_json_request(path, &BTreeMap::new());
         let request = self.request_builder(Method::POST, prepared)?;
         let response = self.execute(request).await?;
         self.decode_json(response).await
@@ -377,9 +376,7 @@ impl OpenAIClient {
     }
 }
 
-fn build_header_map(
-    headers: &BTreeMap<String, String>,
-) -> Result<HeaderMap, OpenAIError> {
+fn build_header_map(headers: &BTreeMap<String, String>) -> Result<HeaderMap, OpenAIError> {
     let mut header_map = HeaderMap::new();
 
     for (name, value) in headers {
@@ -574,7 +571,10 @@ mod tests {
         let client = OpenAIClient::new(config(base_url)).unwrap();
         let request = response_request();
 
-        let response = client.create_response(&request, &Default::default()).await.unwrap();
+        let response = client
+            .create_response(&request, &Default::default())
+            .await
+            .unwrap();
         assert_eq!(response.body.id, "resp_123");
         assert_eq!(response.body.status.as_deref(), Some("completed"));
 
@@ -691,7 +691,10 @@ mod tests {
         request.conversation = Some(serde_json::json!({"id":"conv_1"}));
         request.previous_response_id = Some("resp_prev".to_string());
 
-        let error = client.create_response(&request, &Default::default()).await.unwrap_err();
+        let error = client
+            .create_response(&request, &Default::default())
+            .await
+            .unwrap_err();
         match error {
             OpenAIError::InvalidRequestShape(message) => {
                 assert!(message.contains("previous_response_id"));
@@ -738,7 +741,10 @@ mod tests {
             spawn_server(http_response("200 OK", "application/json", body)).await;
         let client = OpenAIClient::new(config(base_url)).unwrap();
 
-        let response = client.compact_response(&compact_request(), &Default::default()).await.unwrap();
+        let response = client
+            .compact_response(&compact_request(), &Default::default())
+            .await
+            .unwrap();
         assert_eq!(response.body.object, "response.compaction");
         assert_eq!(response.body.output.as_ref().unwrap().len(), 2);
 

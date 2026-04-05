@@ -16,8 +16,8 @@ pub use request::AnthropicRequestTranslator;
 pub use response::AnthropicResponseTranslator;
 pub use stream::AnthropicStreamParser;
 
-use aigw_core::model::FinishReason;
 use crate::types::StopReason;
+use aigw_core::model::FinishReason;
 
 /// Canonical conversion: Anthropic stop reason → canonical finish reason.
 ///

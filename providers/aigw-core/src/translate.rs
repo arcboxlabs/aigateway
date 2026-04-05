@@ -77,10 +77,7 @@ pub trait RequestTranslator: Send + Sync {
     /// 3. Apply defaults for required fields (e.g. `max_tokens` for Anthropic)
     /// 4. Serialize the native request body into `TranslatedRequest::body`
     /// 5. Build the full URL and provider-specific headers
-    fn translate_request(
-        &self,
-        req: &ChatRequest,
-    ) -> Result<TranslatedRequest, TranslateError>;
+    fn translate_request(&self, req: &ChatRequest) -> Result<TranslatedRequest, TranslateError>;
 
     /// Translate a streaming request.
     ///

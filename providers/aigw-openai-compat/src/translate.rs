@@ -3,10 +3,10 @@
 //! Wraps the OpenAI translator and applies Quirks-based filtering: unsupported
 //! fields are stripped or rejected before delegation.
 
+use aigw_core::ForwardCompatible;
 use aigw_core::error::TranslateError;
 use aigw_core::model::{ChatRequest, MessageContent, TypedContentPart};
 use aigw_core::translate::{RequestTranslator, TranslatedRequest};
-use aigw_core::ForwardCompatible;
 use aigw_openai::translate::{OpenAIRequestTranslator, OpenAIResponseTranslator};
 use aigw_openai::{OpenAITransport, OpenAITransportConfig};
 
@@ -40,10 +40,7 @@ impl OpenAICompatRequestTranslator {
 }
 
 impl RequestTranslator for OpenAICompatRequestTranslator {
-    fn translate_request(
-        &self,
-        req: &ChatRequest,
-    ) -> Result<TranslatedRequest, TranslateError> {
+    fn translate_request(&self, req: &ChatRequest) -> Result<TranslatedRequest, TranslateError> {
         self.validate_and_delegate(req, false)
     }
 
@@ -156,16 +153,16 @@ mod tests {
             model: "llama-3".into(),
             messages: vec![Message {
                 role: Role::User,
-                content: Some(MessageContent::Parts(vec![
-                    ContentPart::Known(TypedContentPart::ImageUrl {
+                content: Some(MessageContent::Parts(vec![ContentPart::Known(
+                    TypedContentPart::ImageUrl {
                         image_url: ImageUrl {
                             url: "https://example.com/img.png".into(),
                             detail: None,
                             extra: Default::default(),
                         },
                         extra: Default::default(),
-                    }),
-                ])),
+                    },
+                )])),
                 name: None,
                 tool_call_id: None,
                 tool_calls: None,
@@ -222,10 +219,8 @@ mod tests {
     #[test]
     fn quirks_strips_parallel_tool_calls() {
         let mut req = make_request_with_tool_choice();
-        req.extra.insert(
-            "parallel_tool_calls".into(),
-            serde_json::Value::Bool(true),
-        );
+        req.extra
+            .insert("parallel_tool_calls".into(), serde_json::Value::Bool(true));
 
         let quirks = Quirks {
             supports_parallel_tool_calls: false,

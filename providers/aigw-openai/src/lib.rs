@@ -8,8 +8,8 @@ pub mod transport;
 pub mod wire_types;
 
 pub use client::{
-    OpenAIChatCompletionStream, OpenAIClient, OpenAIResponse, OpenAIResponseStream,
-    RequestOptions, ResponseMeta,
+    OpenAIChatCompletionStream, OpenAIClient, OpenAIResponse, OpenAIResponseStream, RequestOptions,
+    ResponseMeta,
 };
 pub use error::{OpenAIApiError, OpenAIApiErrorKind, OpenAIError};
 pub use sse::{OpenAISseError, OpenAISseStream, parse_openai_sse};

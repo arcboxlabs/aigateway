@@ -126,9 +126,16 @@ pub struct Message {
 /// Covers all roles across providers: `system`/`developer` (OpenAI),
 /// `user`, `assistant`, `tool` (OpenAI/Anthropic/Gemini).
 #[derive(
-    Debug, Clone, PartialEq, Eq, Hash,
-    Serialize, Deserialize,
-    strum::Display, strum::EnumString, strum::AsRefStr,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    strum::Display,
+    strum::EnumString,
+    strum::AsRefStr,
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
@@ -290,9 +297,15 @@ pub enum ToolChoice {
 }
 
 #[derive(
-    Debug, Clone, PartialEq, Eq,
-    Serialize, Deserialize,
-    strum::Display, strum::EnumString, strum::AsRefStr,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    strum::Display,
+    strum::EnumString,
+    strum::AsRefStr,
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
@@ -343,16 +356,14 @@ impl<'de> Deserialize<'de> for ToolChoice {
                     .expect("strum default variant guarantees infallible parse");
                 Ok(Self::Mode(mode))
             }
-            Value::Object(_) => {
-                match serde_json::from_value::<NamedToolChoice>(value.clone()) {
-                    Ok(named) => Ok(Self::Named(named)),
-                    Err(_) => {
-                        let obj: JsonObject = serde_json::from_value(value)
-                            .map_err(serde::de::Error::custom)?;
-                        Ok(Self::Raw(obj))
-                    }
+            Value::Object(_) => match serde_json::from_value::<NamedToolChoice>(value.clone()) {
+                Ok(named) => Ok(Self::Named(named)),
+                Err(_) => {
+                    let obj: JsonObject =
+                        serde_json::from_value(value).map_err(serde::de::Error::custom)?;
+                    Ok(Self::Raw(obj))
                 }
-            }
+            },
             _ => Err(serde::de::Error::custom(
                 "tool_choice must be a string or object",
             )),
@@ -459,8 +470,14 @@ mod tests {
         let content = req.messages[0].content.as_ref().unwrap();
         match content {
             MessageContent::Parts(parts) => {
-                assert!(matches!(parts[0], ContentPart::Known(TypedContentPart::Text { .. })));
-                assert!(matches!(parts[1], ContentPart::Known(TypedContentPart::ImageUrl { .. })));
+                assert!(matches!(
+                    parts[0],
+                    ContentPart::Known(TypedContentPart::Text { .. })
+                ));
+                assert!(matches!(
+                    parts[1],
+                    ContentPart::Known(TypedContentPart::ImageUrl { .. })
+                ));
                 assert!(matches!(parts[2], ContentPart::Raw(..)));
             }
             MessageContent::Text(_) => panic!("expected multipart"),

@@ -47,10 +47,7 @@ pub enum StreamEvent {
     },
 
     /// Incremental tool call arguments (partial JSON string).
-    ToolCallDelta {
-        index: u32,
-        arguments: String,
-    },
+    ToolCallDelta { index: u32, arguments: String },
 
     /// The model has finished generating.
     Finish(FinishReason),

@@ -282,28 +282,28 @@ mod tests {
             }
             buf.extend_from_slice(&chunk[..n]);
 
-            if header_end.is_none() {
-                if let Some(pos) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
-                    header_end = Some(pos + 4);
-                    let headers = String::from_utf8_lossy(&buf[..pos + 4]);
-                    content_length = headers
-                        .lines()
-                        .find_map(|line| {
-                            let (name, value) = line.split_once(':')?;
-                            if name.eq_ignore_ascii_case("content-length") {
-                                value.trim().parse().ok()
-                            } else {
-                                None
-                            }
-                        })
-                        .unwrap_or(0);
-                }
+            if header_end.is_none()
+                && let Some(pos) = buf.windows(4).position(|w| w == b"\r\n\r\n")
+            {
+                header_end = Some(pos + 4);
+                let headers = String::from_utf8_lossy(&buf[..pos + 4]);
+                content_length = headers
+                    .lines()
+                    .find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        if name.eq_ignore_ascii_case("content-length") {
+                            value.trim().parse().ok()
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(0);
             }
 
-            if let Some(end) = header_end {
-                if buf.len() >= end + content_length {
-                    break;
-                }
+            if let Some(end) = header_end
+                && buf.len() >= end + content_length
+            {
+                break;
             }
         }
 

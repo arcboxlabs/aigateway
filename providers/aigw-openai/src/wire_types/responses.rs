@@ -37,7 +37,17 @@ pub enum ResponseToolChoice {
     Raw(JsonObject),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString, strum::AsRefStr)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    strum::Display,
+    strum::EnumString,
+    strum::AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum ResponseToolChoiceMode {
@@ -49,7 +59,17 @@ pub enum ResponseToolChoiceMode {
     Unknown(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString, strum::AsRefStr)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    strum::Display,
+    strum::EnumString,
+    strum::AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum ResponseAllowedToolsMode {
@@ -834,8 +854,12 @@ mod tests {
                 extra,
             }) => {
                 assert_eq!(mode, ResponseAllowedToolsMode::Required);
-                assert!(matches!(&tools[0], ResponseTool::Typed(t) if matches!(**t, TypedResponseTool::Function { .. })));
-                assert!(matches!(&tools[1], ResponseTool::Typed(t) if matches!(**t, TypedResponseTool::Mcp { .. })));
+                assert!(
+                    matches!(&tools[0], ResponseTool::Typed(t) if matches!(**t, TypedResponseTool::Function { .. }))
+                );
+                assert!(
+                    matches!(&tools[1], ResponseTool::Typed(t) if matches!(**t, TypedResponseTool::Mcp { .. }))
+                );
                 assert_eq!(extra.get("x_trace").unwrap(), "123");
             }
             other => panic!("expected allowed_tools choice, got {other:?}"),

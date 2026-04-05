@@ -51,7 +51,10 @@ impl ClientConfig {
             return Err(Error::Config("base_url is required".into()));
         }
         if !(self.base_url.starts_with("http://") || self.base_url.starts_with("https://")) {
-            return Err(Error::Config(format!("invalid base_url: {}", self.base_url)));
+            return Err(Error::Config(format!(
+                "invalid base_url: {}",
+                self.base_url
+            )));
         }
         if self.timeout.is_zero() {
             return Err(Error::Config("timeout must be greater than zero".into()));

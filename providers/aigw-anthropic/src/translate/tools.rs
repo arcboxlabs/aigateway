@@ -4,8 +4,8 @@
 //! Response direction: Anthropic → canonical (OpenAI format)
 
 use aigw_core::model::{
-    FunctionCall, NamedToolChoice, Tool as CanonicalTool, ToolCall, ToolChoice as CanonicalToolChoice,
-    ToolChoiceMode,
+    FunctionCall, NamedToolChoice, Tool as CanonicalTool, ToolCall,
+    ToolChoice as CanonicalToolChoice, ToolChoiceMode,
 };
 
 use crate::types::{Tool as AnthropicTool, ToolChoice as AnthropicToolChoice};
@@ -50,12 +50,10 @@ pub fn translate_tool_choice(tc: &CanonicalToolChoice) -> AnthropicToolChoice {
                 disable_parallel_tool_use: None,
             },
         },
-        CanonicalToolChoice::Named(NamedToolChoice { function, .. }) => {
-            AnthropicToolChoice::Tool {
-                name: function.name.clone(),
-                disable_parallel_tool_use: None,
-            }
-        }
+        CanonicalToolChoice::Named(NamedToolChoice { function, .. }) => AnthropicToolChoice::Tool {
+            name: function.name.clone(),
+            disable_parallel_tool_use: None,
+        },
         CanonicalToolChoice::Raw(_) => AnthropicToolChoice::Auto {
             disable_parallel_tool_use: None,
         },
@@ -106,7 +104,10 @@ mod tests {
         let anthropic = translate_tools(&[canonical]);
         assert_eq!(anthropic.len(), 1);
         assert_eq!(anthropic[0].name, "get_weather");
-        assert_eq!(anthropic[0].description.as_deref(), Some("Get weather info"));
+        assert_eq!(
+            anthropic[0].description.as_deref(),
+            Some("Get weather info")
+        );
         assert!(anthropic[0].input_schema.get("properties").is_some());
     }
 

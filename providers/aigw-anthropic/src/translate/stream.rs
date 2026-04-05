@@ -9,8 +9,7 @@ use aigw_core::model::{StreamEvent as CanonicalStreamEvent, Usage};
 use aigw_core::translate::StreamParser;
 
 use crate::types::{
-    ContentBlock, ContentDelta,
-    StreamEvent as AnthropicStreamEvent, TypedContentBlock,
+    ContentBlock, ContentDelta, StreamEvent as AnthropicStreamEvent, TypedContentBlock,
 };
 
 /// Stateful parser for Anthropic SSE streams.
@@ -264,7 +263,10 @@ mod tests {
 
         let events = p.parse_event("message_delta", data).unwrap();
         assert_eq!(events.len(), 2);
-        assert!(matches!(&events[0], CanonicalStreamEvent::Finish(FinishReason::Stop)));
+        assert!(matches!(
+            &events[0],
+            CanonicalStreamEvent::Finish(FinishReason::Stop)
+        ));
         match &events[1] {
             CanonicalStreamEvent::Usage(u) => {
                 assert_eq!(u.prompt_tokens, Some(25));
@@ -296,7 +298,8 @@ mod tests {
     #[test]
     fn error_event_returns_err() {
         let mut p = parser();
-        let data = r#"{"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}"#;
+        let data =
+            r#"{"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}"#;
         let err = p.parse_event("error", data).unwrap_err();
         assert!(matches!(err, TranslateError::StreamParse { .. }));
     }
@@ -333,10 +336,16 @@ mod tests {
         }
 
         // Verify the sequence.
-        assert!(matches!(&all_events[0], CanonicalStreamEvent::ResponseMeta { .. }));
+        assert!(matches!(
+            &all_events[0],
+            CanonicalStreamEvent::ResponseMeta { .. }
+        ));
         assert!(matches!(&all_events[1], CanonicalStreamEvent::ContentDelta(s) if s == "Hello"));
         assert!(matches!(&all_events[2], CanonicalStreamEvent::ContentDelta(s) if s == " world"));
-        assert!(matches!(&all_events[3], CanonicalStreamEvent::Finish(FinishReason::Stop)));
+        assert!(matches!(
+            &all_events[3],
+            CanonicalStreamEvent::Finish(FinishReason::Stop)
+        ));
         assert!(matches!(&all_events[4], CanonicalStreamEvent::Usage(_)));
         assert!(matches!(&all_events[5], CanonicalStreamEvent::Done));
     }

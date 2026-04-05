@@ -7,16 +7,14 @@
 //! - Tool call arguments (JSON string) parsed into JSON objects
 
 use aigw_core::error::TranslateError;
-use aigw_core::model::{
-    ChatRequest, ContentPart, Message, MessageContent, Role, TypedContentPart,
-};
+use aigw_core::model::{ChatRequest, ContentPart, Message, MessageContent, Role, TypedContentPart};
 use aigw_core::translate::{RequestTranslator, TranslatedRequest};
 use bytes::Bytes;
 use http::{HeaderMap, Method};
 
 use crate::types::{
     ContentBlock, ImageSource, Message as AnthropicMessage, MessageContent as AnthropicContent,
-    Metadata, MessagesRequest, Role as AnthropicRole, SystemPrompt, TypedContentBlock,
+    MessagesRequest, Metadata, Role as AnthropicRole, SystemPrompt, TypedContentBlock,
 };
 
 use super::tools;
@@ -41,18 +39,16 @@ impl AnthropicRequestTranslator {
 }
 
 impl RequestTranslator for AnthropicRequestTranslator {
-    fn translate_request(
-        &self,
-        req: &ChatRequest,
-    ) -> Result<TranslatedRequest, TranslateError> {
+    fn translate_request(&self, req: &ChatRequest) -> Result<TranslatedRequest, TranslateError> {
         // Reject unsupported features.
         if let Some(n) = req.n
-            && n > 1 {
-                return Err(TranslateError::UnsupportedFeature {
-                    provider: "anthropic",
-                    feature: "n > 1".into(),
-                });
-            }
+            && n > 1
+        {
+            return Err(TranslateError::UnsupportedFeature {
+                provider: "anthropic",
+                feature: "n > 1".into(),
+            });
+        }
 
         let system = extract_system(&req.messages);
         let messages = translate_messages(&req.messages)?;
@@ -75,29 +71,13 @@ impl RequestTranslator for AnthropicRequestTranslator {
             .maybe_system(system)
             .maybe_temperature(req.temperature)
             .maybe_top_p(req.top_p)
-            .maybe_stop_sequences(
-                req.stop
-                    .as_ref()
-                    .map(|s| s.to_vec()),
-            )
+            .maybe_stop_sequences(req.stop.as_ref().map(|s| s.to_vec()))
             .maybe_stream(req.stream)
-            .maybe_tools(
-                req.tools
-                    .as_ref()
-                    .map(|t| tools::translate_tools(t)),
-            )
-            .maybe_tool_choice(
-                req.tool_choice
-                    .as_ref()
-                    .map(tools::translate_tool_choice),
-            )
-            .maybe_metadata(
-                req.user
-                    .as_ref()
-                    .map(|u| Metadata {
-                        user_id: Some(u.clone()),
-                    }),
-            )
+            .maybe_tools(req.tools.as_ref().map(|t| tools::translate_tools(t)))
+            .maybe_tool_choice(req.tool_choice.as_ref().map(tools::translate_tool_choice))
+            .maybe_metadata(req.user.as_ref().map(|u| Metadata {
+                user_id: Some(u.clone()),
+            }))
             .maybe_thinking(thinking)
             .extra(extra)
             .build();
@@ -273,9 +253,7 @@ fn translate_tool_result(msg: &Message) -> Result<ContentBlock, TranslateError> 
         MessageContent::Text(s) => crate::types::ToolResultContent::Text(s.clone()),
         MessageContent::Parts(_) => {
             // Serialize parts content as text fallback.
-            crate::types::ToolResultContent::Text(
-                serde_json::to_string(c).unwrap_or_default(),
-            )
+            crate::types::ToolResultContent::Text(serde_json::to_string(c).unwrap_or_default())
         }
     });
 
@@ -314,16 +292,17 @@ fn translate_content_part(part: &ContentPart) -> Result<ContentBlock, TranslateE
 
 fn translate_image_source(url: &str) -> Result<ImageSource, TranslateError> {
     if let Some(rest) = url.strip_prefix("data:") {
-        let (header, data) = rest
-            .split_once(',')
-            .ok_or_else(|| TranslateError::IncompatibleContent {
-                reason: "malformed data: URI".into(),
-            })?;
-        let media_type = header
-            .strip_suffix(";base64")
-            .ok_or_else(|| TranslateError::IncompatibleContent {
-                reason: "data: URI must be base64-encoded".into(),
-            })?;
+        let (header, data) =
+            rest.split_once(',')
+                .ok_or_else(|| TranslateError::IncompatibleContent {
+                    reason: "malformed data: URI".into(),
+                })?;
+        let media_type =
+            header
+                .strip_suffix(";base64")
+                .ok_or_else(|| TranslateError::IncompatibleContent {
+                    reason: "data: URI must be base64-encoded".into(),
+                })?;
         Ok(ImageSource::Base64 {
             media_type: media_type.to_owned(),
             data: data.to_owned(),
@@ -545,6 +524,11 @@ mod tests {
         };
 
         let err = translate_tool_result(&msg).unwrap_err();
-        assert!(matches!(err, TranslateError::MissingField { field: "tool_call_id" }));
+        assert!(matches!(
+            err,
+            TranslateError::MissingField {
+                field: "tool_call_id"
+            }
+        ));
     }
 }

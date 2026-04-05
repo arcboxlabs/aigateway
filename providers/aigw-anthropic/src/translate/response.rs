@@ -1,15 +1,11 @@
 //! Response translation: Anthropic Messages API → canonical types.
 
 use aigw_core::error::{ProviderError, TranslateError, map_error_status};
-use aigw_core::model::{
-    ChatResponse, Choice, FinishReason, Message, MessageContent, Role, Usage,
-};
+use aigw_core::model::{ChatResponse, Choice, FinishReason, Message, MessageContent, Role, Usage};
 use aigw_core::translate::{ResponseTranslator, StreamParser};
 use http::{HeaderMap, StatusCode};
 
-use crate::types::{
-    ApiErrorResponse, ContentBlock, MessagesResponse, TypedContentBlock,
-};
+use crate::types::{ApiErrorResponse, ContentBlock, MessagesResponse, TypedContentBlock};
 
 use super::stream::AnthropicStreamParser;
 use super::tools;
@@ -138,8 +134,8 @@ impl ResponseTranslator for AnthropicResponseTranslator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
     use aigw_core::translate::ResponseTranslator;
+    use std::time::Duration;
 
     #[test]
     fn translate_text_response() {
@@ -259,11 +255,8 @@ mod tests {
         headers.insert("retry-after", "60".parse().unwrap());
 
         let translator = AnthropicResponseTranslator;
-        let err = translator.translate_error(
-            StatusCode::TOO_MANY_REQUESTS,
-            &headers,
-            body.as_bytes(),
-        );
+        let err =
+            translator.translate_error(StatusCode::TOO_MANY_REQUESTS, &headers, body.as_bytes());
 
         match err {
             ProviderError::RateLimited {

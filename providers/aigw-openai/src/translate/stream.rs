@@ -63,32 +63,35 @@ impl StreamParser for OpenAIStreamParser {
         for choice in &chunk.choices {
             // Text content delta.
             if let Some(text) = &choice.delta.content
-                && !text.is_empty() {
-                    events.push(StreamEvent::ContentDelta(text.clone()));
-                }
+                && !text.is_empty()
+            {
+                events.push(StreamEvent::ContentDelta(text.clone()));
+            }
 
             // Tool call deltas.
             if let Some(tool_calls) = &choice.delta.tool_calls {
                 for tc in tool_calls {
                     // ToolCallStart: first appearance has id + function.name.
                     if let (Some(id), Some(func)) = (&tc.id, &tc.function)
-                        && let Some(name) = &func.name {
-                            events.push(StreamEvent::ToolCallStart {
-                                index: tc.index,
-                                id: id.clone(),
-                                name: name.clone(),
-                            });
-                        }
+                        && let Some(name) = &func.name
+                    {
+                        events.push(StreamEvent::ToolCallStart {
+                            index: tc.index,
+                            id: id.clone(),
+                            name: name.clone(),
+                        });
+                    }
 
                     // ToolCallDelta: subsequent chunks carry function.arguments.
                     if let Some(func) = &tc.function
                         && let Some(args) = &func.arguments
-                            && !args.is_empty() {
-                                events.push(StreamEvent::ToolCallDelta {
-                                    index: tc.index,
-                                    arguments: args.clone(),
-                                });
-                            }
+                        && !args.is_empty()
+                    {
+                        events.push(StreamEvent::ToolCallDelta {
+                            index: tc.index,
+                            arguments: args.clone(),
+                        });
+                    }
                 }
             }
 
@@ -123,7 +126,9 @@ impl StreamParser for OpenAIStreamParser {
 /// unknown strings fall into `FinishReason::Unknown`.
 fn map_finish_reason(reason: &str) -> FinishReason {
     // strum's #[strum(default)] guarantees this never fails.
-    reason.parse().unwrap_or(FinishReason::Unknown(reason.to_owned()))
+    reason
+        .parse()
+        .unwrap_or(FinishReason::Unknown(reason.to_owned()))
 }
 
 #[cfg(test)]

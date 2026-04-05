@@ -58,9 +58,15 @@ pub struct Choice {
 /// | `ToolCalls`     | `tool_calls`     | `tool_use`       | —              |
 /// | `ContentFilter` | `content_filter` | —                | `SAFETY`       |
 #[derive(
-    Debug, Clone, PartialEq, Eq,
-    Serialize, Deserialize,
-    strum::Display, strum::EnumString, strum::AsRefStr,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    strum::Display,
+    strum::EnumString,
+    strum::AsRefStr,
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
@@ -113,7 +119,10 @@ mod tests {
             (r#""length""#, FinishReason::Length),
             (r#""tool_calls""#, FinishReason::ToolCalls),
             (r#""content_filter""#, FinishReason::ContentFilter),
-            (r#""custom_reason""#, FinishReason::Unknown("custom_reason".into())),
+            (
+                r#""custom_reason""#,
+                FinishReason::Unknown("custom_reason".into()),
+            ),
         ] {
             let parsed: FinishReason = serde_json::from_str(json).unwrap();
             assert_eq!(parsed, expected);

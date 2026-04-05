@@ -28,14 +28,11 @@ impl OpenAIRequestTranslator {
 }
 
 impl RequestTranslator for OpenAIRequestTranslator {
-    fn translate_request(
-        &self,
-        req: &ChatRequest,
-    ) -> Result<TranslatedRequest, TranslateError> {
+    fn translate_request(&self, req: &ChatRequest) -> Result<TranslatedRequest, TranslateError> {
         let body = serde_json::to_vec(req)?;
-        let transport_req =
-            self.transport
-                .prepare_json_request("/chat/completions", &BTreeMap::new());
+        let transport_req = self
+            .transport
+            .prepare_json_request("/chat/completions", &BTreeMap::new());
         let headers = btree_to_headermap(&transport_req.headers)?;
 
         Ok(TranslatedRequest {
@@ -136,10 +133,7 @@ mod tests {
     #[test]
     fn extra_fields_pass_through_to_wire() {
         let mut extra = serde_json::Map::new();
-        extra.insert(
-            "logprobs".into(),
-            serde_json::Value::Bool(true),
-        );
+        extra.insert("logprobs".into(), serde_json::Value::Bool(true));
         extra.insert(
             "max_completion_tokens".into(),
             serde_json::Value::Number(8192.into()),
