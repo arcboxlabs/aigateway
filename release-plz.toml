@@ -1,0 +1,74 @@
+[workspace]
+repo_url = "https://github.com/arcboxlabs/aigateway"
+semver_check = true
+publish_timeout = "10m"
+pr_labels = ["release"]
+# 0.x 阶段 feat 仍然 bump minor（0.1 → 0.2），而非仅 bump patch
+features_always_increment_minor = true
+
+# --- 包级配置 ---
+
+# 主二进制：发 crates.io（cargo install aigateway）+ GitHub Release
+[[package]]
+name = "aigateway"
+git_release_enable = true
+git_tag_name = "v{{ version }}"
+git_release_name = "aigateway v{{ version }}"
+# 聚合所有子 crate 的变更到主 release changelog
+changelog_include = ["aigw", "aigw-openai", "aigw-openai-compat", "aigw-anthropic", "aigw-gemini"]
+
+# 伞 crate：发 crates.io，聚合 provider changelog
+[[package]]
+name = "aigw"
+changelog_include = ["aigw-openai", "aigw-openai-compat", "aigw-anthropic", "aigw-gemini"]
+
+# Provider crates：独立版本，各自 changelog
+[[package]]
+name = "aigw-openai"
+
+[[package]]
+name = "aigw-openai-compat"
+
+[[package]]
+name = "aigw-anthropic"
+
+[[package]]
+name = "aigw-gemini"
+
+# --- Changelog 格式 ---
+
+[changelog]
+header = """# Changelog
+
+All notable changes to this project will be documented in this file.\n"""
+
+body = """
+## [{{ version }}]{% if release_link %}({{ release_link }}){% endif %} - {{ timestamp | date(format="%Y-%m-%d") }}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+{% for commit in commits %}
+{%- if commit.scope -%}
+- *({{ commit.scope }})* {% if commit.breaking %}[**breaking**] {% endif %}\
+{{ commit.message }}
+{%- else -%}
+- {% if commit.breaking %}[**breaking**] {% endif %}\
+{{ commit.message }}
+{%- endif %}
+{%- endfor %}
+{% endfor %}"""
+
+commit_parsers = [
+    { message = "^feat", group = "<!-- 0 -->Added" },
+    { message = "^fix", group = "<!-- 1 -->Fixed" },
+    { message = "^refactor", group = "<!-- 2 -->Refactored" },
+    { message = "^perf", group = "<!-- 3 -->Performance" },
+    { message = "^doc", group = "<!-- 4 -->Documentation" },
+    { message = "^test", group = "<!-- 5 -->Testing" },
+    { message = "^chore\\(release\\)", skip = true },
+    { message = "^chore\\(deps\\)", skip = true },
+    { message = "^chore|^ci", group = "<!-- 6 -->Miscellaneous" },
+]
+
+link_parsers = [
+    { pattern = "#(\\d+)", href = "https://github.com/arcboxlabs/aigateway/issues/$1" },
+]
