@@ -6,6 +6,10 @@ description = "Anthropic provider for AI Gateway"
 license = "MIT"
 repository = "https://github.com/arcboxlabs/aigateway"
 
+[features]
+default = []
+claude-code = []
+
 [dependencies]
 bon = "3"
 serde = { version = "1", features = ["derive"] }
@@ -18,3 +22,7 @@ bytes = "1"
 eventsource-stream = "0.2"
 secrecy = "0.10"
 tokio = { version = "1", features = ["rt"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util"] }
+futures-util = "0.3"

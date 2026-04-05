@@ -1,5 +1,6 @@
 //! Error types for the Anthropic provider.
 
+use crate::transport::TransportConfigError;
 use crate::types::ApiError;
 
 /// Errors that can occur when using the Anthropic API client.
@@ -41,7 +42,11 @@ pub enum Error {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
 
-    /// Invalid client configuration.
+    /// Invalid transport configuration.
+    #[error("transport config: {0}")]
+    Transport(#[from] TransportConfigError),
+
+    /// Invalid client configuration (non-transport).
     #[error("invalid configuration: {0}")]
     Config(String),
 }
