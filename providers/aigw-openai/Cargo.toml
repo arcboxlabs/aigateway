@@ -1,10 +1,10 @@
 [package]
 name = "aigw-openai"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 description = "OpenAI provider for AI Gateway"
-license = "MIT"
-repository = "https://github.com/arcboxlabs/aigateway"
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 bon = "3"

@@ -11,7 +11,7 @@ dependencies = [
 
 [[package]]
 name = "aigw"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "aigw-anthropic",
  "aigw-gemini",
@@ -73,7 +73,7 @@ dependencies = [
 
 [[package]]
 name = "aigw-openai-compat"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "aigw-openai",
  "secrecy",

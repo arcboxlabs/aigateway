@@ -1,13 +1,13 @@
 [package]
 name = "aigw-openai-compat"
-version = "0.0.1"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 description = "Configurable OpenAI-compatible provider for AI Gateway"
-license = "MIT"
-repository = "https://github.com/arcboxlabs/aigateway"
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
-aigw-openai = { version = "0.1.0", path = "../aigw-openai" }
+aigw-openai = { workspace = true }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
 

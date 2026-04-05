@@ -8,13 +8,26 @@ members = [
 ]
 resolver = "3"
 
-[package]
-name = "aigateway"
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
-description = "A unified AI Gateway for multiple LLM providers"
 license = "MIT"
 repository = "https://github.com/arcboxlabs/aigateway"
 
+[workspace.dependencies]
+aigw = { version = "0.1.0", path = "providers/aigw" }
+aigw-openai = { version = "0.1.0", path = "providers/aigw-openai" }
+aigw-openai-compat = { version = "0.1.0", path = "providers/aigw-openai-compat" }
+aigw-anthropic = { version = "0.1.0", path = "providers/aigw-anthropic" }
+aigw-gemini = { version = "0.1.0", path = "providers/aigw-gemini" }
+
+[package]
+name = "aigateway"
+version.workspace = true
+edition.workspace = true
+description = "A unified AI Gateway for multiple LLM providers"
+license.workspace = true
+repository.workspace = true
+
 [dependencies]
-aigw = { version = "0.0.1", path = "providers/aigw" }
+aigw = { workspace = true }

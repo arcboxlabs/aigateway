@@ -7,10 +7,12 @@ pr_labels = ["release"]
 features_always_increment_minor = true
 
 # --- 包级配置 ---
+# 所有 crate 使用统一版本号（version_group）
 
 # 主二进制：发 crates.io（cargo install aigateway）+ GitHub Release
 [[package]]
 name = "aigateway"
+version_group = "aigw"
 git_release_enable = true
 git_tag_name = "v{{ version }}"
 git_release_name = "aigateway v{{ version }}"
@@ -20,20 +22,25 @@ changelog_include = ["aigw", "aigw-openai", "aigw-openai-compat", "aigw-anthropi
 # 伞 crate：发 crates.io，聚合 provider changelog
 [[package]]
 name = "aigw"
+version_group = "aigw"
 changelog_include = ["aigw-openai", "aigw-openai-compat", "aigw-anthropic", "aigw-gemini"]
 
-# Provider crates：独立版本，各自 changelog
+# Provider crates
 [[package]]
 name = "aigw-openai"
+version_group = "aigw"
 
 [[package]]
 name = "aigw-openai-compat"
+version_group = "aigw"
 
 [[package]]
 name = "aigw-anthropic"
+version_group = "aigw"
 
 [[package]]
 name = "aigw-gemini"
+version_group = "aigw"
 
 # --- Changelog 格式 ---
 
