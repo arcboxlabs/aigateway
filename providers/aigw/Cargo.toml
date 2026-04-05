@@ -14,7 +14,7 @@ anthropic = ["dep:aigw-anthropic"]
 gemini = ["dep:aigw-gemini"]
 
 [dependencies]
-aigw-openai = { version = "0.0.1", path = "../aigw-openai", optional = true }
+aigw-openai = { version = "0.1.0", path = "../aigw-openai", optional = true }
 aigw-openai-compat = { version = "0.0.1", path = "../aigw-openai-compat", optional = true }
-aigw-anthropic = { version = "0.0.1", path = "../aigw-anthropic", optional = true }
-aigw-gemini = { version = "0.0.1", path = "../aigw-gemini", optional = true }
+aigw-anthropic = { version = "0.1.0", path = "../aigw-anthropic", optional = true }
+aigw-gemini = { version = "0.1.0", path = "../aigw-gemini", optional = true }
