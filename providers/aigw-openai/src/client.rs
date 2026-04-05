@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::pin::Pin;
 use std::time::Duration;
 
@@ -27,6 +28,53 @@ pub type OpenAIChatCompletionStream =
     Pin<Box<dyn Stream<Item = Result<ChatCompletionChunk, OpenAIError>> + Send>>;
 pub type OpenAIResponseStream =
     Pin<Box<dyn Stream<Item = Result<ResponseStreamEvent, OpenAIError>> + Send>>;
+
+/// Per-request options for OpenAI API calls.
+///
+/// Use this to pass additional headers (e.g. `x-codex-turn-state`, `session_id`)
+/// that are specific to a single request rather than all requests on the client.
+#[derive(Debug, Clone, Default)]
+pub struct RequestOptions {
+    /// Additional HTTP headers to include in this specific request.
+    ///
+    /// These are merged with (and override) the client's default headers.
+    pub extra_headers: BTreeMap<String, String>,
+}
+
+/// Metadata extracted from an OpenAI API response.
+///
+/// Captures HTTP-level information (headers, request ID) that lives outside
+/// the JSON body. Useful for forwarding `x-codex-turn-state` in gateway
+/// scenarios or reading `x-request-id` for observability.
+#[derive(Debug, Clone)]
+pub struct ResponseMeta {
+    /// The `x-request-id` header, if present.
+    pub request_id: Option<String>,
+    /// All response headers.
+    pub headers: HeaderMap,
+}
+
+impl ResponseMeta {
+    fn from_response(response: &Response) -> Self {
+        Self {
+            request_id: response
+                .headers()
+                .get("x-request-id")
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_owned),
+            headers: response.headers().clone(),
+        }
+    }
+}
+
+/// An OpenAI API response paired with HTTP-level metadata.
+#[derive(Debug, Clone)]
+pub struct OpenAIResponse<T> {
+    /// The parsed response body.
+    pub body: T,
+    /// HTTP-level metadata (response headers, request ID).
+    pub meta: ResponseMeta,
+}
 
 #[derive(Clone, Debug)]
 pub struct OpenAIClient {
@@ -77,57 +125,99 @@ impl OpenAIClient {
     pub async fn create_chat_completion(
         &self,
         request: &ChatCompletionRequest,
-    ) -> Result<ChatCompletionResponse, OpenAIError> {
-        self.post_json("/chat/completions", request).await
+        options: &RequestOptions,
+    ) -> Result<OpenAIResponse<ChatCompletionResponse>, OpenAIError> {
+        let response = self
+            .post_json_response_with_headers("/chat/completions", request, &options.extra_headers)
+            .await?;
+        let meta = ResponseMeta::from_response(&response);
+        let body = self.decode_json(response).await?;
+        Ok(OpenAIResponse { body, meta })
     }
 
     pub async fn create_response(
         &self,
         request: &ResponseCreateRequest,
-    ) -> Result<ResponseObject, OpenAIError> {
+        options: &RequestOptions,
+    ) -> Result<OpenAIResponse<ResponseObject>, OpenAIError> {
         request
             .validate()
             .map_err(|error| OpenAIError::InvalidRequestShape(error.to_string()))?;
-        self.post_json("/responses", request).await
+        let response = self
+            .post_json_response_with_headers("/responses", request, &options.extra_headers)
+            .await?;
+        let meta = ResponseMeta::from_response(&response);
+        let body = self.decode_json(response).await?;
+        Ok(OpenAIResponse { body, meta })
     }
 
     pub async fn count_response_input_tokens(
         &self,
         request: &ResponseInputTokensRequest,
-    ) -> Result<ResponseInputTokensResponse, OpenAIError> {
+        options: &RequestOptions,
+    ) -> Result<OpenAIResponse<ResponseInputTokensResponse>, OpenAIError> {
         request
             .validate()
             .map_err(|error| OpenAIError::InvalidRequestShape(error.to_string()))?;
-        self.post_json("/responses/input_tokens", request).await
+        let response = self
+            .post_json_response_with_headers(
+                "/responses/input_tokens",
+                request,
+                &options.extra_headers,
+            )
+            .await?;
+        let meta = ResponseMeta::from_response(&response);
+        let body = self.decode_json(response).await?;
+        Ok(OpenAIResponse { body, meta })
     }
 
     pub async fn compact_response(
         &self,
         request: &ResponseCompactRequest,
-    ) -> Result<ResponseCompaction, OpenAIError> {
-        self.post_json("/responses/compact", request).await
+        options: &RequestOptions,
+    ) -> Result<OpenAIResponse<ResponseCompaction>, OpenAIError> {
+        let response = self
+            .post_json_response_with_headers("/responses/compact", request, &options.extra_headers)
+            .await?;
+        let meta = ResponseMeta::from_response(&response);
+        let body = self.decode_json(response).await?;
+        Ok(OpenAIResponse { body, meta })
     }
 
     pub async fn stream_chat_completion(
         &self,
         request: &ChatCompletionRequest,
-    ) -> Result<OpenAIChatCompletionStream, OpenAIError> {
+        options: &RequestOptions,
+    ) -> Result<OpenAIResponse<OpenAIChatCompletionStream>, OpenAIError> {
         let mut streamed_request = request.clone();
         streamed_request.stream = Some(true);
 
         let response = self
-            .post_json_response("/chat/completions", &streamed_request)
+            .post_json_response_with_headers(
+                "/chat/completions",
+                &streamed_request,
+                &options.extra_headers,
+            )
             .await?;
+        let meta = ResponseMeta::from_response(&response);
         let stream = parse_openai_sse::<_, _, _, ChatCompletionChunk>(response.bytes_stream())
             .map(|item| item.map_err(OpenAIError::from));
 
-        Ok(Box::pin(stream))
+        Ok(OpenAIResponse {
+            body: Box::pin(stream),
+            meta,
+        })
     }
 
+    /// Send a streaming Responses API request.
+    ///
+    /// The [`ResponseMeta`] in the returned [`OpenAIResponse`] is captured from
+    /// the initial HTTP response headers before streaming begins.
     pub async fn stream_response(
         &self,
         request: &ResponseCreateRequest,
-    ) -> Result<OpenAIResponseStream, OpenAIError> {
+        options: &RequestOptions,
+    ) -> Result<OpenAIResponse<OpenAIResponseStream>, OpenAIError> {
         request
             .validate()
             .map_err(|error| OpenAIError::InvalidRequestShape(error.to_string()))?;
@@ -135,17 +225,25 @@ impl OpenAIClient {
         let mut streamed_request = request.clone();
         streamed_request.stream = Some(true);
 
+        let mut headers = BTreeMap::from([("Accept".to_owned(), "text/event-stream".to_owned())]);
+        headers.extend(
+            options
+                .extra_headers
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone())),
+        );
+
         let response = self
-            .post_json_response_with_headers(
-                "/responses",
-                &streamed_request,
-                &HeaderMapSpec::sse_accept(),
-            )
+            .post_json_response_with_headers("/responses", &streamed_request, &headers)
             .await?;
+        let meta = ResponseMeta::from_response(&response);
         let stream = parse_openai_sse::<_, _, _, ResponseStreamEvent>(response.bytes_stream())
             .map(|item| item.map_err(OpenAIError::from));
 
-        Ok(Box::pin(stream))
+        Ok(OpenAIResponse {
+            body: Box::pin(stream),
+            meta,
+        })
     }
 
     pub async fn list_models(&self) -> Result<ModelListResponse, OpenAIError> {
@@ -177,22 +275,34 @@ impl OpenAIClient {
         &self,
         response_id: &str,
         starting_after: Option<&str>,
-    ) -> Result<OpenAIResponseStream, OpenAIError> {
+        options: &RequestOptions,
+    ) -> Result<OpenAIResponse<OpenAIResponseStream>, OpenAIError> {
         let query = ResponseRetrieveStreamQuery {
             stream: true,
             starting_after: starting_after.map(str::to_owned),
         };
 
-        let prepared = self.transport.prepare_request(
-            &format!("/responses/{response_id}"),
-            &HeaderMapSpec::sse_accept(),
+        let mut headers = BTreeMap::from([("Accept".to_owned(), "text/event-stream".to_owned())]);
+        headers.extend(
+            options
+                .extra_headers
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone())),
         );
+
+        let prepared = self
+            .transport
+            .prepare_request(&format!("/responses/{response_id}"), &headers);
         let request = self.request_builder(Method::GET, prepared)?.query(&query);
         let response = self.execute(request).await?;
+        let meta = ResponseMeta::from_response(&response);
         let stream = parse_openai_sse::<_, _, _, ResponseStreamEvent>(response.bytes_stream())
             .map(|item| item.map_err(OpenAIError::from));
 
-        Ok(Box::pin(stream))
+        Ok(OpenAIResponse {
+            body: Box::pin(stream),
+            meta,
+        })
     }
 
     async fn get_json<T>(&self, path: &str) -> Result<T, OpenAIError>
@@ -201,36 +311,17 @@ impl OpenAIClient {
     {
         let prepared = self
             .transport
-            .prepare_request(path, &HeaderMapSpec::json_accept_only());
+            .prepare_request(path, &BTreeMap::from([("Accept".to_owned(), "application/json".to_owned())]));
         let request = self.request_builder(Method::GET, prepared)?;
         let response = self.execute(request).await?;
         self.decode_json(response).await
-    }
-
-    async fn post_json<T, B>(&self, path: &str, body: &B) -> Result<T, OpenAIError>
-    where
-        T: DeserializeOwned,
-        B: Serialize + ?Sized,
-    {
-        let response = self
-            .post_json_response_with_headers(path, body, &HeaderMapSpec::empty())
-            .await?;
-        self.decode_json(response).await
-    }
-
-    async fn post_json_response<B>(&self, path: &str, body: &B) -> Result<Response, OpenAIError>
-    where
-        B: Serialize + ?Sized,
-    {
-        self.post_json_response_with_headers(path, body, &HeaderMapSpec::empty())
-            .await
     }
 
     async fn post_json_response_with_headers<B>(
         &self,
         path: &str,
         body: &B,
-        extra_headers: &std::collections::BTreeMap<String, String>,
+        extra_headers: &BTreeMap<String, String>,
     ) -> Result<Response, OpenAIError>
     where
         B: Serialize + ?Sized,
@@ -246,7 +337,7 @@ impl OpenAIClient {
     {
         let prepared = self
             .transport
-            .prepare_json_request(path, &HeaderMapSpec::empty());
+            .prepare_json_request(path, &BTreeMap::new());
         let request = self.request_builder(Method::POST, prepared)?;
         let response = self.execute(request).await?;
         self.decode_json(response).await
@@ -287,7 +378,7 @@ impl OpenAIClient {
 }
 
 fn build_header_map(
-    headers: &std::collections::BTreeMap<String, String>,
+    headers: &BTreeMap<String, String>,
 ) -> Result<HeaderMap, OpenAIError> {
     let mut header_map = HeaderMap::new();
 
@@ -342,22 +433,6 @@ async fn api_error_from_response(response: Response) -> OpenAIError {
         request_id,
         body,
     }))
-}
-
-struct HeaderMapSpec;
-
-impl HeaderMapSpec {
-    fn empty() -> std::collections::BTreeMap<String, String> {
-        std::collections::BTreeMap::new()
-    }
-
-    fn json_accept_only() -> std::collections::BTreeMap<String, String> {
-        std::collections::BTreeMap::from([("Accept".to_owned(), "application/json".to_owned())])
-    }
-
-    fn sse_accept() -> std::collections::BTreeMap<String, String> {
-        std::collections::BTreeMap::from([("Accept".to_owned(), "text/event-stream".to_owned())])
-    }
 }
 
 #[cfg(test)]
@@ -433,14 +508,15 @@ mod tests {
                 refusal: None,
                 tool_call_id: None,
                 tool_calls: None,
-                extra: BTreeMap::new(),
+                extra: Default::default(),
             }])
             .build();
 
         let chunks = client
-            .stream_chat_completion(&request)
+            .stream_chat_completion(&request, &Default::default())
             .await
             .unwrap()
+            .body
             .collect::<Vec<_>>()
             .await;
 
@@ -498,9 +574,9 @@ mod tests {
         let client = OpenAIClient::new(config(base_url)).unwrap();
         let request = response_request();
 
-        let response = client.create_response(&request).await.unwrap();
-        assert_eq!(response.id, "resp_123");
-        assert_eq!(response.status.as_deref(), Some("completed"));
+        let response = client.create_response(&request, &Default::default()).await.unwrap();
+        assert_eq!(response.body.id, "resp_123");
+        assert_eq!(response.body.status.as_deref(), Some("completed"));
 
         let request = request_rx.await.unwrap().to_lowercase();
         assert!(request.contains("post /v1/responses http/1.1"));
@@ -521,9 +597,10 @@ mod tests {
         let client = OpenAIClient::new(config(base_url)).unwrap();
 
         let events = client
-            .stream_response(&response_request())
+            .stream_response(&response_request(), &Default::default())
             .await
             .unwrap()
+            .body
             .collect::<Vec<_>>()
             .await;
 
@@ -551,9 +628,10 @@ mod tests {
         let client = OpenAIClient::new(config(base_url)).unwrap();
 
         let events = client
-            .retrieve_response_stream("resp_123", Some("evt_9"))
+            .retrieve_response_stream("resp_123", Some("evt_9"), &Default::default())
             .await
             .unwrap()
+            .body
             .collect::<Vec<_>>()
             .await;
 
@@ -613,7 +691,7 @@ mod tests {
         request.conversation = Some(serde_json::json!({"id":"conv_1"}));
         request.previous_response_id = Some("resp_prev".to_string());
 
-        let error = client.create_response(&request).await.unwrap_err();
+        let error = client.create_response(&request, &Default::default()).await.unwrap_err();
         match error {
             OpenAIError::InvalidRequestShape(message) => {
                 assert!(message.contains("previous_response_id"));
@@ -633,10 +711,10 @@ mod tests {
         let client = OpenAIClient::new(config(base_url)).unwrap();
 
         let response = client
-            .count_response_input_tokens(&input_tokens_request())
+            .count_response_input_tokens(&input_tokens_request(), &Default::default())
             .await
             .unwrap();
-        assert_eq!(response.input_tokens, Some(139));
+        assert_eq!(response.body.input_tokens, Some(139));
 
         let request = request_rx.await.unwrap().to_lowercase();
         assert!(request.contains("post /v1/responses/input_tokens http/1.1"));
@@ -660,9 +738,9 @@ mod tests {
             spawn_server(http_response("200 OK", "application/json", body)).await;
         let client = OpenAIClient::new(config(base_url)).unwrap();
 
-        let response = client.compact_response(&compact_request()).await.unwrap();
-        assert_eq!(response.object, "response.compaction");
-        assert_eq!(response.output.as_ref().unwrap().len(), 2);
+        let response = client.compact_response(&compact_request(), &Default::default()).await.unwrap();
+        assert_eq!(response.body.object, "response.compaction");
+        assert_eq!(response.body.output.as_ref().unwrap().len(), 2);
 
         let request = request_rx.await.unwrap().to_lowercase();
         assert!(request.contains("post /v1/responses/compact http/1.1"));

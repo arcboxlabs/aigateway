@@ -25,6 +25,7 @@ pub use responses::{
     ResponseOutputItem, ResponsePromptCacheRetention, ResponseReasoning,
     ResponseRetrieveStreamQuery, ResponseStreamEvent, ResponseStreamOptions, ResponseTextConfig,
     ResponseTool, ResponseToolChoice, ResponseToolChoiceMode, ResponseUsage,
+    TypedResponseNamespaceTool, TypedResponseTool, TypedResponseToolChoice,
 };
 pub use responses_output::{
     ResponseCodeInterpreterOutput, ResponseFileSearchResult, ResponseOutputTextAnnotation,

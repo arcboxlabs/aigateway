@@ -2,12 +2,11 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use bon::Builder;
-use serde::de::Error as DeError;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub use super::responses_output::{ResponseContentPart, ResponseOutputItem};
-use super::shared::{JsonObject, json_object_from_value, json_object_is_empty};
+use super::shared::{JsonObject, json_object_is_empty};
 
 pub type ResponseInput = Value;
 pub type ResponseConversation = Value;
@@ -16,909 +15,49 @@ pub type ResponseReasoning = Value;
 pub type ResponseInputItem = Value;
 pub type ResponsePromptCacheRetention = Value;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum ResponseTool {
-    Function {
-        name: String,
-        parameters: Option<Value>,
-        strict: Option<bool>,
-        defer_loading: Option<bool>,
-        description: Option<String>,
-        extra: JsonObject,
-    },
-    FileSearch {
-        vector_store_ids: Option<Vec<String>>,
-        filters: Option<Value>,
-        max_num_results: Option<u32>,
-        ranking_options: Option<Value>,
-        extra: JsonObject,
-    },
-    Computer {
-        extra: JsonObject,
-    },
-    ComputerUsePreview {
-        display_height: u32,
-        display_width: u32,
-        environment: String,
-        extra: JsonObject,
-    },
-    WebSearch {
-        filters: Option<Value>,
-        search_context_size: Option<String>,
-        user_location: Option<Value>,
-        extra: JsonObject,
-    },
-    WebSearch20250826 {
-        filters: Option<Value>,
-        search_context_size: Option<String>,
-        user_location: Option<Value>,
-        extra: JsonObject,
-    },
-    Mcp {
-        server_label: String,
-        allowed_tools: Option<Value>,
-        authorization: Option<String>,
-        connector_id: Option<String>,
-        defer_loading: Option<bool>,
-        headers: Option<JsonObject>,
-        require_approval: Option<Value>,
-        server_description: Option<String>,
-        server_url: Option<String>,
-        extra: JsonObject,
-    },
-    CodeInterpreter {
-        container: Option<Value>,
-        extra: JsonObject,
-    },
-    ImageGeneration {
-        action: Option<String>,
-        background: Option<String>,
-        input_fidelity: Option<String>,
-        input_image_mask: Option<Value>,
-        model: Option<Value>,
-        moderation: Option<String>,
-        output_compression: Option<u8>,
-        output_format: Option<String>,
-        partial_images: Option<u8>,
-        quality: Option<String>,
-        size: Option<String>,
-        extra: JsonObject,
-    },
-    LocalShell {
-        extra: JsonObject,
-    },
-    Custom {
-        name: String,
-        defer_loading: Option<bool>,
-        description: Option<String>,
-        format: Option<Value>,
-        extra: JsonObject,
-    },
-    Namespace {
-        description: String,
-        name: String,
-        tools: Vec<ResponseNamespaceTool>,
-        extra: JsonObject,
-    },
-    ToolSearch {
-        description: Option<String>,
-        execution: Option<String>,
-        parameters: Option<Value>,
-        extra: JsonObject,
-    },
-    WebSearchPreview {
-        search_content_types: Option<Vec<String>>,
-        search_context_size: Option<String>,
-        user_location: Option<Value>,
-        extra: JsonObject,
-    },
-    WebSearchPreview20250311 {
-        search_content_types: Option<Vec<String>>,
-        search_context_size: Option<String>,
-        user_location: Option<Value>,
-        extra: JsonObject,
-    },
-    ApplyPatch {
-        extra: JsonObject,
-    },
-    Shell {
-        environment: Option<Value>,
-        extra: JsonObject,
-    },
+    Typed(Box<TypedResponseTool>),
     Raw(JsonObject),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum ResponseNamespaceTool {
-    Function {
-        name: String,
-        defer_loading: Option<bool>,
-        description: Option<String>,
-        parameters: Option<Value>,
-        strict: Option<bool>,
-        extra: JsonObject,
-    },
-    Custom {
-        name: String,
-        defer_loading: Option<bool>,
-        description: Option<String>,
-        format: Option<Value>,
-        extra: JsonObject,
-    },
+    Typed(TypedResponseNamespaceTool),
     Raw(JsonObject),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum ResponseToolChoice {
     Mode(ResponseToolChoiceMode),
-    AllowedTools {
-        mode: ResponseAllowedToolsMode,
-        tools: Vec<ResponseTool>,
-        extra: JsonObject,
-    },
-    FileSearch {
-        extra: JsonObject,
-    },
-    WebSearchPreview {
-        extra: JsonObject,
-    },
-    WebSearchPreview20250311 {
-        extra: JsonObject,
-    },
-    Computer {
-        extra: JsonObject,
-    },
-    ComputerUsePreview {
-        extra: JsonObject,
-    },
-    ComputerUse {
-        extra: JsonObject,
-    },
-    CodeInterpreter {
-        extra: JsonObject,
-    },
-    ImageGeneration {
-        extra: JsonObject,
-    },
-    Function {
-        name: String,
-        extra: JsonObject,
-    },
-    Mcp {
-        server_label: String,
-        name: Option<String>,
-        extra: JsonObject,
-    },
-    Custom {
-        name: String,
-        extra: JsonObject,
-    },
-    ApplyPatch {
-        extra: JsonObject,
-    },
-    Shell {
-        extra: JsonObject,
-    },
+    Typed(TypedResponseToolChoice),
     Raw(JsonObject),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString, strum::AsRefStr)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ResponseToolChoiceMode {
     None,
     Auto,
     Required,
+    #[serde(untagged)]
+    #[strum(default)]
     Unknown(String),
 }
 
-impl ResponseToolChoiceMode {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::None => "none",
-            Self::Auto => "auto",
-            Self::Required => "required",
-            Self::Unknown(value) => value.as_str(),
-        }
-    }
-}
-
-impl Serialize for ResponseToolChoiceMode {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for ResponseToolChoiceMode {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        Ok(match value.as_str() {
-            "none" => Self::None,
-            "auto" => Self::Auto,
-            "required" => Self::Required,
-            _ => Self::Unknown(value),
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString, strum::AsRefStr)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ResponseAllowedToolsMode {
     Auto,
     Required,
+    #[serde(untagged)]
+    #[strum(default)]
     Unknown(String),
-}
-
-impl ResponseAllowedToolsMode {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Auto => "auto",
-            Self::Required => "required",
-            Self::Unknown(value) => value.as_str(),
-        }
-    }
-}
-
-impl Serialize for ResponseAllowedToolsMode {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for ResponseAllowedToolsMode {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        Ok(match value.as_str() {
-            "auto" => Self::Auto,
-            "required" => Self::Required,
-            _ => Self::Unknown(value),
-        })
-    }
-}
-
-impl Serialize for ResponseNamespaceTool {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            Self::Function {
-                name,
-                defer_loading,
-                description,
-                parameters,
-                strict,
-                extra,
-            } => KnownResponseNamespaceTool::Function {
-                name: name.clone(),
-                defer_loading: *defer_loading,
-                description: description.clone(),
-                parameters: parameters.clone(),
-                strict: *strict,
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Custom {
-                name,
-                defer_loading,
-                description,
-                format,
-                extra,
-            } => KnownResponseNamespaceTool::Custom {
-                name: name.clone(),
-                defer_loading: *defer_loading,
-                description: description.clone(),
-                format: format.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Raw(raw) => raw.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for ResponseNamespaceTool {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = Value::deserialize(deserializer)?;
-        if let Ok(typed) = serde_json::from_value::<KnownResponseNamespaceTool>(value.clone()) {
-            return Ok(match typed {
-                KnownResponseNamespaceTool::Function {
-                    name,
-                    defer_loading,
-                    description,
-                    parameters,
-                    strict,
-                    extra,
-                } => Self::Function {
-                    name,
-                    defer_loading,
-                    description,
-                    parameters,
-                    strict,
-                    extra,
-                },
-                KnownResponseNamespaceTool::Custom {
-                    name,
-                    defer_loading,
-                    description,
-                    format,
-                    extra,
-                } => Self::Custom {
-                    name,
-                    defer_loading,
-                    description,
-                    format,
-                    extra,
-                },
-            });
-        }
-
-        Ok(Self::Raw(
-            json_object_from_value(value).map_err(D::Error::custom)?,
-        ))
-    }
-}
-
-impl Serialize for ResponseTool {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            Self::Function {
-                name,
-                parameters,
-                strict,
-                defer_loading,
-                description,
-                extra,
-            } => KnownResponseTool::Function {
-                name: name.clone(),
-                parameters: parameters.clone(),
-                strict: *strict,
-                defer_loading: *defer_loading,
-                description: description.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::FileSearch {
-                vector_store_ids,
-                filters,
-                max_num_results,
-                ranking_options,
-                extra,
-            } => KnownResponseTool::FileSearch {
-                vector_store_ids: vector_store_ids.clone(),
-                filters: filters.clone(),
-                max_num_results: *max_num_results,
-                ranking_options: ranking_options.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Computer { extra } => KnownResponseTool::Computer {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::ComputerUsePreview {
-                display_height,
-                display_width,
-                environment,
-                extra,
-            } => KnownResponseTool::ComputerUsePreview {
-                display_height: *display_height,
-                display_width: *display_width,
-                environment: environment.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::WebSearch {
-                filters,
-                search_context_size,
-                user_location,
-                extra,
-            } => KnownResponseTool::WebSearch {
-                filters: filters.clone(),
-                search_context_size: search_context_size.clone(),
-                user_location: user_location.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::WebSearch20250826 {
-                filters,
-                search_context_size,
-                user_location,
-                extra,
-            } => KnownResponseTool::WebSearch20250826 {
-                filters: filters.clone(),
-                search_context_size: search_context_size.clone(),
-                user_location: user_location.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Mcp {
-                server_label,
-                allowed_tools,
-                authorization,
-                connector_id,
-                defer_loading,
-                headers,
-                require_approval,
-                server_description,
-                server_url,
-                extra,
-            } => KnownResponseTool::Mcp {
-                server_label: server_label.clone(),
-                allowed_tools: allowed_tools.clone(),
-                authorization: authorization.clone(),
-                connector_id: connector_id.clone(),
-                defer_loading: *defer_loading,
-                headers: headers.clone(),
-                require_approval: require_approval.clone(),
-                server_description: server_description.clone(),
-                server_url: server_url.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::CodeInterpreter { container, extra } => KnownResponseTool::CodeInterpreter {
-                container: container.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::ImageGeneration {
-                action,
-                background,
-                input_fidelity,
-                input_image_mask,
-                model,
-                moderation,
-                output_compression,
-                output_format,
-                partial_images,
-                quality,
-                size,
-                extra,
-            } => KnownResponseTool::ImageGeneration {
-                action: action.clone(),
-                background: background.clone(),
-                input_fidelity: input_fidelity.clone(),
-                input_image_mask: input_image_mask.clone(),
-                model: model.clone(),
-                moderation: moderation.clone(),
-                output_compression: *output_compression,
-                output_format: output_format.clone(),
-                partial_images: *partial_images,
-                quality: quality.clone(),
-                size: size.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::LocalShell { extra } => KnownResponseTool::LocalShell {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Custom {
-                name,
-                defer_loading,
-                description,
-                format,
-                extra,
-            } => KnownResponseTool::Custom {
-                name: name.clone(),
-                defer_loading: *defer_loading,
-                description: description.clone(),
-                format: format.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Namespace {
-                description,
-                name,
-                tools,
-                extra,
-            } => KnownResponseTool::Namespace {
-                description: description.clone(),
-                name: name.clone(),
-                tools: tools.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::ToolSearch {
-                description,
-                execution,
-                parameters,
-                extra,
-            } => KnownResponseTool::ToolSearch {
-                description: description.clone(),
-                execution: execution.clone(),
-                parameters: parameters.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::WebSearchPreview {
-                search_content_types,
-                search_context_size,
-                user_location,
-                extra,
-            } => KnownResponseTool::WebSearchPreview {
-                search_content_types: search_content_types.clone(),
-                search_context_size: search_context_size.clone(),
-                user_location: user_location.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::WebSearchPreview20250311 {
-                search_content_types,
-                search_context_size,
-                user_location,
-                extra,
-            } => KnownResponseTool::WebSearchPreview20250311 {
-                search_content_types: search_content_types.clone(),
-                search_context_size: search_context_size.clone(),
-                user_location: user_location.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::ApplyPatch { extra } => KnownResponseTool::ApplyPatch {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Shell { environment, extra } => KnownResponseTool::Shell {
-                environment: environment.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Raw(raw) => raw.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for ResponseTool {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = Value::deserialize(deserializer)?;
-        if let Ok(typed) = serde_json::from_value::<KnownResponseTool>(value.clone()) {
-            return Ok(match typed {
-                KnownResponseTool::Function {
-                    name,
-                    parameters,
-                    strict,
-                    defer_loading,
-                    description,
-                    extra,
-                } => Self::Function {
-                    name,
-                    parameters,
-                    strict,
-                    defer_loading,
-                    description,
-                    extra,
-                },
-                KnownResponseTool::FileSearch {
-                    vector_store_ids,
-                    filters,
-                    max_num_results,
-                    ranking_options,
-                    extra,
-                } => Self::FileSearch {
-                    vector_store_ids,
-                    filters,
-                    max_num_results,
-                    ranking_options,
-                    extra,
-                },
-                KnownResponseTool::Computer { extra } => Self::Computer { extra },
-                KnownResponseTool::ComputerUsePreview {
-                    display_height,
-                    display_width,
-                    environment,
-                    extra,
-                } => Self::ComputerUsePreview {
-                    display_height,
-                    display_width,
-                    environment,
-                    extra,
-                },
-                KnownResponseTool::WebSearch {
-                    filters,
-                    search_context_size,
-                    user_location,
-                    extra,
-                } => Self::WebSearch {
-                    filters,
-                    search_context_size,
-                    user_location,
-                    extra,
-                },
-                KnownResponseTool::WebSearch20250826 {
-                    filters,
-                    search_context_size,
-                    user_location,
-                    extra,
-                } => Self::WebSearch20250826 {
-                    filters,
-                    search_context_size,
-                    user_location,
-                    extra,
-                },
-                KnownResponseTool::Mcp {
-                    server_label,
-                    allowed_tools,
-                    authorization,
-                    connector_id,
-                    defer_loading,
-                    headers,
-                    require_approval,
-                    server_description,
-                    server_url,
-                    extra,
-                } => Self::Mcp {
-                    server_label,
-                    allowed_tools,
-                    authorization,
-                    connector_id,
-                    defer_loading,
-                    headers,
-                    require_approval,
-                    server_description,
-                    server_url,
-                    extra,
-                },
-                KnownResponseTool::CodeInterpreter { container, extra } => {
-                    Self::CodeInterpreter { container, extra }
-                }
-                KnownResponseTool::ImageGeneration {
-                    action,
-                    background,
-                    input_fidelity,
-                    input_image_mask,
-                    model,
-                    moderation,
-                    output_compression,
-                    output_format,
-                    partial_images,
-                    quality,
-                    size,
-                    extra,
-                } => Self::ImageGeneration {
-                    action,
-                    background,
-                    input_fidelity,
-                    input_image_mask,
-                    model,
-                    moderation,
-                    output_compression,
-                    output_format,
-                    partial_images,
-                    quality,
-                    size,
-                    extra,
-                },
-                KnownResponseTool::LocalShell { extra } => Self::LocalShell { extra },
-                KnownResponseTool::Custom {
-                    name,
-                    defer_loading,
-                    description,
-                    format,
-                    extra,
-                } => Self::Custom {
-                    name,
-                    defer_loading,
-                    description,
-                    format,
-                    extra,
-                },
-                KnownResponseTool::Namespace {
-                    description,
-                    name,
-                    tools,
-                    extra,
-                } => Self::Namespace {
-                    description,
-                    name,
-                    tools,
-                    extra,
-                },
-                KnownResponseTool::ToolSearch {
-                    description,
-                    execution,
-                    parameters,
-                    extra,
-                } => Self::ToolSearch {
-                    description,
-                    execution,
-                    parameters,
-                    extra,
-                },
-                KnownResponseTool::WebSearchPreview {
-                    search_content_types,
-                    search_context_size,
-                    user_location,
-                    extra,
-                } => Self::WebSearchPreview {
-                    search_content_types,
-                    search_context_size,
-                    user_location,
-                    extra,
-                },
-                KnownResponseTool::WebSearchPreview20250311 {
-                    search_content_types,
-                    search_context_size,
-                    user_location,
-                    extra,
-                } => Self::WebSearchPreview20250311 {
-                    search_content_types,
-                    search_context_size,
-                    user_location,
-                    extra,
-                },
-                KnownResponseTool::ApplyPatch { extra } => Self::ApplyPatch { extra },
-                KnownResponseTool::Shell { environment, extra } => {
-                    Self::Shell { environment, extra }
-                }
-            });
-        }
-
-        Ok(Self::Raw(
-            json_object_from_value(value).map_err(D::Error::custom)?,
-        ))
-    }
-}
-
-impl Serialize for ResponseToolChoice {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            Self::Mode(mode) => mode.serialize(serializer),
-            Self::AllowedTools { mode, tools, extra } => KnownResponseToolChoice::AllowedTools {
-                mode: mode.clone(),
-                tools: tools.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::FileSearch { extra } => KnownResponseToolChoice::FileSearch {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::WebSearchPreview { extra } => KnownResponseToolChoice::WebSearchPreview {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::WebSearchPreview20250311 { extra } => {
-                KnownResponseToolChoice::WebSearchPreview20250311 {
-                    extra: extra.clone(),
-                }
-                .serialize(serializer)
-            }
-            Self::Computer { extra } => KnownResponseToolChoice::Computer {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::ComputerUsePreview { extra } => KnownResponseToolChoice::ComputerUsePreview {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::ComputerUse { extra } => KnownResponseToolChoice::ComputerUse {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::CodeInterpreter { extra } => KnownResponseToolChoice::CodeInterpreter {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::ImageGeneration { extra } => KnownResponseToolChoice::ImageGeneration {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Function { name, extra } => KnownResponseToolChoice::Function {
-                name: name.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Mcp {
-                server_label,
-                name,
-                extra,
-            } => KnownResponseToolChoice::Mcp {
-                server_label: server_label.clone(),
-                name: name.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Custom { name, extra } => KnownResponseToolChoice::Custom {
-                name: name.clone(),
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::ApplyPatch { extra } => KnownResponseToolChoice::ApplyPatch {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Shell { extra } => KnownResponseToolChoice::Shell {
-                extra: extra.clone(),
-            }
-            .serialize(serializer),
-            Self::Raw(raw) => raw.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for ResponseToolChoice {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = Value::deserialize(deserializer)?;
-        match value {
-            Value::String(raw) => Ok(Self::Mode(ResponseToolChoiceMode::from(raw))),
-            Value::Object(object) => {
-                if let Ok(typed) =
-                    serde_json::from_value::<KnownResponseToolChoice>(Value::Object(object.clone()))
-                {
-                    return Ok(match typed {
-                        KnownResponseToolChoice::AllowedTools { mode, tools, extra } => {
-                            Self::AllowedTools { mode, tools, extra }
-                        }
-                        KnownResponseToolChoice::FileSearch { extra } => Self::FileSearch { extra },
-                        KnownResponseToolChoice::WebSearchPreview { extra } => {
-                            Self::WebSearchPreview { extra }
-                        }
-                        KnownResponseToolChoice::WebSearchPreview20250311 { extra } => {
-                            Self::WebSearchPreview20250311 { extra }
-                        }
-                        KnownResponseToolChoice::Computer { extra } => Self::Computer { extra },
-                        KnownResponseToolChoice::ComputerUsePreview { extra } => {
-                            Self::ComputerUsePreview { extra }
-                        }
-                        KnownResponseToolChoice::ComputerUse { extra } => {
-                            Self::ComputerUse { extra }
-                        }
-                        KnownResponseToolChoice::CodeInterpreter { extra } => {
-                            Self::CodeInterpreter { extra }
-                        }
-                        KnownResponseToolChoice::ImageGeneration { extra } => {
-                            Self::ImageGeneration { extra }
-                        }
-                        KnownResponseToolChoice::Function { name, extra } => {
-                            Self::Function { name, extra }
-                        }
-                        KnownResponseToolChoice::Mcp {
-                            server_label,
-                            name,
-                            extra,
-                        } => Self::Mcp {
-                            server_label,
-                            name,
-                            extra,
-                        },
-                        KnownResponseToolChoice::Custom { name, extra } => {
-                            Self::Custom { name, extra }
-                        }
-                        KnownResponseToolChoice::ApplyPatch { extra } => Self::ApplyPatch { extra },
-                        KnownResponseToolChoice::Shell { extra } => Self::Shell { extra },
-                    });
-                }
-
-                Ok(Self::Raw(object.into_iter().collect()))
-            }
-            _ => Err(D::Error::custom("expected string or object")),
-        }
-    }
 }
 
 impl From<String> for ResponseToolChoiceMode {
@@ -934,7 +73,7 @@ impl From<String> for ResponseToolChoiceMode {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
-enum KnownResponseNamespaceTool {
+pub enum TypedResponseNamespaceTool {
     #[serde(rename = "function")]
     Function {
         name: String,
@@ -965,7 +104,7 @@ enum KnownResponseNamespaceTool {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
-enum KnownResponseTool {
+pub enum TypedResponseTool {
     #[serde(rename = "function")]
     Function {
         name: String,
@@ -1158,7 +297,7 @@ enum KnownResponseTool {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
-enum KnownResponseToolChoice {
+pub enum TypedResponseToolChoice {
     #[serde(rename = "allowed_tools")]
     AllowedTools {
         mode: ResponseAllowedToolsMode,
@@ -1548,7 +687,7 @@ mod tests {
     use super::{
         ResponseAllowedToolsMode, ResponseCompactRequest, ResponseCreateRequest,
         ResponseInputTokensRequest, ResponseRetrieveStreamQuery, ResponseStreamEvent, ResponseTool,
-        ResponseToolChoice, ResponseToolChoiceMode,
+        ResponseToolChoice, ResponseToolChoiceMode, TypedResponseTool, TypedResponseToolChoice,
     };
 
     #[test]
@@ -1626,17 +765,20 @@ mod tests {
         .unwrap();
 
         match tool {
-            ResponseTool::Function {
-                name,
-                strict,
-                extra,
-                ..
-            } => {
-                assert_eq!(name, "get_weather");
-                assert_eq!(strict, Some(true));
-                assert_eq!(extra.get("x_provider").unwrap(), "compat");
-            }
-            other => panic!("expected function tool, got {other:?}"),
+            ResponseTool::Typed(inner) => match *inner {
+                TypedResponseTool::Function {
+                    ref name,
+                    strict,
+                    ref extra,
+                    ..
+                } => {
+                    assert_eq!(name, "get_weather");
+                    assert_eq!(strict, Some(true));
+                    assert_eq!(extra.get("x_provider").unwrap(), "compat");
+                }
+                other => panic!("expected function tool, got {other:?}"),
+            },
+            other => panic!("expected typed tool, got {other:?}"),
         }
     }
 
@@ -1686,10 +828,14 @@ mod tests {
         .unwrap();
 
         match choice {
-            ResponseToolChoice::AllowedTools { mode, tools, extra } => {
+            ResponseToolChoice::Typed(TypedResponseToolChoice::AllowedTools {
+                mode,
+                tools,
+                extra,
+            }) => {
                 assert_eq!(mode, ResponseAllowedToolsMode::Required);
-                assert!(matches!(tools[0], ResponseTool::Function { .. }));
-                assert!(matches!(tools[1], ResponseTool::Mcp { .. }));
+                assert!(matches!(&tools[0], ResponseTool::Typed(t) if matches!(**t, TypedResponseTool::Function { .. })));
+                assert!(matches!(&tools[1], ResponseTool::Typed(t) if matches!(**t, TypedResponseTool::Mcp { .. })));
                 assert_eq!(extra.get("x_trace").unwrap(), "123");
             }
             other => panic!("expected allowed_tools choice, got {other:?}"),

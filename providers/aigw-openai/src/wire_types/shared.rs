@@ -1,9 +1,7 @@
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub type JsonObject = BTreeMap<String, Value>;
+pub type JsonObject = serde_json::Map<String, Value>;
 
 pub fn json_object_is_empty(value: &JsonObject) -> bool {
     value.is_empty()
@@ -11,7 +9,7 @@ pub fn json_object_is_empty(value: &JsonObject) -> bool {
 
 pub fn json_object_from_value(value: Value) -> Result<JsonObject, &'static str> {
     match value {
-        Value::Object(object) => Ok(object.into_iter().collect()),
+        Value::Object(object) => Ok(object),
         _ => Err("expected JSON object"),
     }
 }
@@ -47,7 +45,7 @@ mod tests {
 
     #[test]
     fn deserialize_error_body_with_extra_fields() {
-        let json = r#"{
+        let json = r#"{ 
             "error": {
                 "message": "bad request",
                 "type": "invalid_request_error",

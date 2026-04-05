@@ -82,53 +82,18 @@ impl ChatMessage {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString, strum::AsRefStr)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ChatMessageRole {
     Developer,
     System,
     User,
     Assistant,
     Tool,
+    #[serde(untagged)]
+    #[strum(default)]
     Unknown(String),
-}
-
-impl ChatMessageRole {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Developer => "developer",
-            Self::System => "system",
-            Self::User => "user",
-            Self::Assistant => "assistant",
-            Self::Tool => "tool",
-            Self::Unknown(value) => value.as_str(),
-        }
-    }
-}
-
-impl Serialize for ChatMessageRole {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for ChatMessageRole {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        Ok(match value.as_str() {
-            "developer" => Self::Developer,
-            "system" => Self::System,
-            "user" => Self::User,
-            "assistant" => Self::Assistant,
-            "tool" => Self::Tool,
-            _ => Self::Unknown(value),
-        })
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -207,47 +172,16 @@ pub enum ChatToolChoice {
     Raw(JsonObject),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString, strum::AsRefStr)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ChatToolChoiceMode {
     None,
     Auto,
     Required,
+    #[serde(untagged)]
+    #[strum(default)]
     Unknown(String),
-}
-
-impl ChatToolChoiceMode {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::None => "none",
-            Self::Auto => "auto",
-            Self::Required => "required",
-            Self::Unknown(value) => value.as_str(),
-        }
-    }
-}
-
-impl Serialize for ChatToolChoiceMode {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for ChatToolChoiceMode {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        Ok(match value.as_str() {
-            "none" => Self::None,
-            "auto" => Self::Auto,
-            "required" => Self::Required,
-            _ => Self::Unknown(value),
-        })
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

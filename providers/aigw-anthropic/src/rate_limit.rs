@@ -29,7 +29,7 @@ use reqwest::header::HeaderMap;
 /// assert_eq!(info.requests_limit, Some(100));
 /// assert_eq!(info.tokens_remaining, Some(90000));
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RateLimitInfo {
     /// Maximum requests allowed in the current window.
     pub requests_limit: Option<u64>,
@@ -97,14 +97,7 @@ impl RateLimitInfo {
 
     /// Returns `true` if no rate limit headers were found at all.
     pub fn is_empty(&self) -> bool {
-        self.requests_limit.is_none()
-            && self.requests_remaining.is_none()
-            && self.tokens_limit.is_none()
-            && self.tokens_remaining.is_none()
-            && self.input_tokens_limit.is_none()
-            && self.input_tokens_remaining.is_none()
-            && self.output_tokens_limit.is_none()
-            && self.output_tokens_remaining.is_none()
+        *self == Self::default()
     }
 }
 

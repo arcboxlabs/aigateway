@@ -11,6 +11,7 @@ default = ["openai", "openai-compat", "anthropic", "gemini"]
 openai = ["dep:aigw-openai"]
 openai-compat = ["dep:aigw-openai-compat", "openai"]
 anthropic = ["dep:aigw-anthropic"]
+anthropic-claude-code = ["anthropic", "aigw-anthropic?/claude-code"]
 gemini = ["dep:aigw-gemini"]
 
 [dependencies]
