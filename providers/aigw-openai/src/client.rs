@@ -8,9 +8,14 @@ use reqwest::{Method, Response};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use secrecy::SecretString;
+
 use crate::error::{OpenAIApiError, OpenAIApiErrorKind, OpenAIError};
 use crate::sse::parse_openai_sse;
-use crate::transport::{OpenAITransport, OpenAITransportConfig, OpenAITransportConfigError};
+use crate::transport::{
+    DEFAULT_OPENAI_BASE_URL, DEFAULT_TIMEOUT_SECONDS, HttpTransportConfig, OpenAIAuthConfig,
+    OpenAITransport, OpenAITransportConfig, OpenAITransportConfigError,
+};
 use crate::wire_types::{
     ApiErrorResponse, ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, Model,
     ModelListResponse, ResponseCompactRequest, ResponseCompaction, ResponseCreateRequest,
@@ -32,6 +37,26 @@ pub struct OpenAIClient {
 impl OpenAIClient {
     pub fn new(config: OpenAITransportConfig) -> Result<Self, OpenAITransportConfigError> {
         Ok(Self::from_transport(OpenAITransport::new(config)?))
+    }
+
+    /// Create a client from the `OPENAI_API_KEY` environment variable.
+    ///
+    /// Uses the default base URL (`https://api.openai.com/v1`) and timeout.
+    pub fn from_env() -> Result<Self, OpenAITransportConfigError> {
+        let api_key = std::env::var("OPENAI_API_KEY")
+            .map_err(|_| OpenAITransportConfigError::MissingApiKey)?;
+        Self::new(OpenAITransportConfig {
+            http: HttpTransportConfig {
+                base_url: DEFAULT_OPENAI_BASE_URL.to_owned(),
+                timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
+                default_headers: std::collections::BTreeMap::new(),
+            },
+            auth: OpenAIAuthConfig {
+                api_key: SecretString::from(api_key),
+                organization: None,
+                project: None,
+            },
+        })
     }
 
     pub fn from_transport(transport: OpenAITransport) -> Self {
@@ -399,9 +424,9 @@ mod tests {
         let (base_url, request_rx) =
             spawn_server(http_response("200 OK", "text/event-stream", &body)).await;
         let client = OpenAIClient::new(config(base_url)).unwrap();
-        let request = ChatCompletionRequest {
-            model: "gpt-4.1".to_owned(),
-            messages: vec![ChatMessage {
+        let request = ChatCompletionRequest::builder()
+            .model("gpt-4.1")
+            .messages(vec![ChatMessage {
                 role: ChatMessageRole::User,
                 content: Some(ChatMessageContent::Text("hi".to_owned())),
                 name: None,
@@ -409,30 +434,8 @@ mod tests {
                 tool_call_id: None,
                 tool_calls: None,
                 extra: BTreeMap::new(),
-            }],
-            frequency_penalty: None,
-            logprobs: None,
-            max_completion_tokens: None,
-            max_tokens: None,
-            metadata: None,
-            n: None,
-            parallel_tool_calls: None,
-            presence_penalty: None,
-            response_format: None,
-            seed: None,
-            service_tier: None,
-            stop: None,
-            store: None,
-            stream: None,
-            stream_options: None,
-            temperature: None,
-            tool_choice: None,
-            tools: None,
-            top_logprobs: None,
-            top_p: None,
-            user: None,
-            extra: BTreeMap::new(),
-        };
+            }])
+            .build();
 
         let chunks = client
             .stream_chat_completion(&request)
@@ -608,7 +611,7 @@ mod tests {
         let client = OpenAIClient::new(config("http://127.0.0.1:1/v1".to_owned())).unwrap();
         let mut request = response_request();
         request.conversation = Some(serde_json::json!({"id":"conv_1"}));
-        request.previous_response_id = Some("resp_prev".to_owned());
+        request.previous_response_id = Some("resp_prev".to_string());
 
         let error = client.create_response(&request).await.unwrap_err();
         match error {
@@ -667,46 +670,49 @@ mod tests {
     }
 
     fn response_request() -> ResponseCreateRequest {
-        let mut request = ResponseCreateRequest::new("gpt-4.1");
-        request.input = Some(serde_json::json!("hello"));
-        request.max_output_tokens = Some(64);
-        request.parallel_tool_calls = Some(true);
-        request.safety_identifier = Some("user-123".to_owned());
-        request.store = Some(false);
-        request.temperature = Some(0.7);
-        request
+        ResponseCreateRequest::builder()
+            .model("gpt-4.1")
+            .input(serde_json::json!("hello"))
+            .max_output_tokens(64_u64)
+            .parallel_tool_calls(true)
+            .safety_identifier("user-123")
+            .store(false)
+            .temperature(0.7_f32)
+            .build()
     }
 
     fn input_tokens_request() -> ResponseInputTokensRequest {
-        let mut request = ResponseInputTokensRequest::new("gpt-4.1");
-        request.input = Some(serde_json::json!("hello"));
-        request.parallel_tool_calls = Some(true);
-        request
+        ResponseInputTokensRequest::builder()
+            .model("gpt-4.1")
+            .input(serde_json::json!("hello"))
+            .parallel_tool_calls(true)
+            .build()
     }
 
     fn compact_request() -> ResponseCompactRequest {
-        let mut request = ResponseCompactRequest::new("gpt-5.1-codex-max");
-        request.input = Some(serde_json::json!([
-            {
-                "role": "user",
-                "content": "Create a simple landing page for a dog petting cafe."
-            },
-            {
-                "id": "msg_001",
-                "type": "message",
-                "status": "completed",
-                "content": [
-                    {
-                        "type": "output_text",
-                        "annotations": [],
-                        "logprobs": [],
-                        "text": "Below is a single file, ready-to-use landing page..."
-                    }
-                ],
-                "role": "assistant"
-            }
-        ]));
-        request
+        ResponseCompactRequest::builder()
+            .model("gpt-5.1-codex-max")
+            .input(serde_json::json!([
+                {
+                    "role": "user",
+                    "content": "Create a simple landing page for a dog petting cafe."
+                },
+                {
+                    "id": "msg_001",
+                    "type": "message",
+                    "status": "completed",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "annotations": [],
+                            "logprobs": [],
+                            "text": "Below is a single file, ready-to-use landing page..."
+                        }
+                    ],
+                    "role": "assistant"
+                }
+            ]))
+            .build()
     }
 
     async fn spawn_server(response: String) -> (String, oneshot::Receiver<String>) {

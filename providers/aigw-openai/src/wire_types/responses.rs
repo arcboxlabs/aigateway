@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
+use bon::Builder;
 use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -866,7 +867,9 @@ impl<'de> Deserialize<'de> for ResponseToolChoice {
         match value {
             Value::String(raw) => Ok(Self::Mode(ResponseToolChoiceMode::from(raw))),
             Value::Object(object) => {
-                if let Ok(typed) = serde_json::from_value::<KnownResponseToolChoice>(Value::Object(object.clone())) {
+                if let Ok(typed) =
+                    serde_json::from_value::<KnownResponseToolChoice>(Value::Object(object.clone()))
+                {
                     return Ok(match typed {
                         KnownResponseToolChoice::AllowedTools { mode, tools, extra } => {
                             Self::AllowedTools { mode, tools, extra }
@@ -1235,7 +1238,8 @@ enum KnownResponseToolChoice {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Builder)]
+#[builder(on(String, into))]
 pub struct ResponseCreateRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background: Option<bool>,
@@ -1289,42 +1293,11 @@ pub struct ResponseCreateRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
     #[serde(flatten, default, skip_serializing_if = "json_object_is_empty")]
+    #[builder(default)]
     pub extra: JsonObject,
 }
 
 impl ResponseCreateRequest {
-    pub fn new(model: impl Into<String>) -> Self {
-        Self {
-            background: None,
-            conversation: None,
-            context_management: None,
-            include: None,
-            input: None,
-            instructions: None,
-            max_output_tokens: None,
-            metadata: None,
-            model: model.into(),
-            parallel_tool_calls: None,
-            previous_response_id: None,
-            prompt_cache_key: None,
-            prompt_cache_retention: None,
-            reasoning: None,
-            safety_identifier: None,
-            service_tier: None,
-            store: None,
-            stream: None,
-            stream_options: None,
-            temperature: None,
-            text: None,
-            tool_choice: None,
-            tools: None,
-            top_p: None,
-            truncation: None,
-            user: None,
-            extra: JsonObject::new(),
-        }
-    }
-
     pub fn validate(&self) -> Result<(), ResponseCreateRequestError> {
         validate_previous_response_id_and_conversation(
             self.previous_response_id.as_deref(),
@@ -1350,7 +1323,8 @@ impl Display for ResponseCreateRequestError {
 
 impl Error for ResponseCreateRequestError {}
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Builder)]
+#[builder(on(String, into))]
 pub struct ResponseInputTokensRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conversation: Option<ResponseConversation>,
@@ -1373,26 +1347,11 @@ pub struct ResponseInputTokensRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<ResponseTool>>,
     #[serde(flatten, default, skip_serializing_if = "json_object_is_empty")]
+    #[builder(default)]
     pub extra: JsonObject,
 }
 
 impl ResponseInputTokensRequest {
-    pub fn new(model: impl Into<String>) -> Self {
-        Self {
-            conversation: None,
-            input: None,
-            instructions: None,
-            model: Some(model.into()),
-            parallel_tool_calls: None,
-            previous_response_id: None,
-            reasoning: None,
-            text: None,
-            tool_choice: None,
-            tools: None,
-            extra: JsonObject::new(),
-        }
-    }
-
     pub fn validate(&self) -> Result<(), ResponseCreateRequestError> {
         validate_previous_response_id_and_conversation(
             self.previous_response_id.as_deref(),
@@ -1410,7 +1369,8 @@ pub struct ResponseInputTokensResponse {
     pub extra: JsonObject,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Builder)]
+#[builder(on(String, into))]
 pub struct ResponseCompactRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input: Option<ResponseInput>,
@@ -1420,19 +1380,8 @@ pub struct ResponseCompactRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_response_id: Option<String>,
     #[serde(flatten, default, skip_serializing_if = "json_object_is_empty")]
+    #[builder(default)]
     pub extra: JsonObject,
-}
-
-impl ResponseCompactRequest {
-    pub fn new(model: impl Into<String>) -> Self {
-        Self {
-            input: None,
-            instructions: None,
-            model: model.into(),
-            previous_response_id: None,
-            extra: JsonObject::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1604,19 +1553,23 @@ mod tests {
 
     #[test]
     fn validate_rejects_previous_response_and_conversation() {
-        let mut request = ResponseCreateRequest::new("gpt-4.1");
+        let mut request = ResponseCreateRequest::builder()
+            .model("gpt-4.1")
+            .input(serde_json::json!("hello"))
+            .build();
         request.conversation = Some(serde_json::json!({"id":"conv_123"}));
-        request.input = Some(serde_json::json!("hello"));
-        request.previous_response_id = Some("resp_123".to_owned());
+        request.previous_response_id = Some("resp_123".to_string());
 
         assert!(request.validate().is_err());
     }
 
     #[test]
     fn input_tokens_validate_rejects_previous_response_and_conversation() {
-        let mut request = ResponseInputTokensRequest::new("gpt-4.1");
+        let mut request = ResponseInputTokensRequest::builder()
+            .model("gpt-4.1")
+            .build();
         request.conversation = Some(serde_json::json!({"id":"conv_123"}));
-        request.previous_response_id = Some("resp_123".to_owned());
+        request.previous_response_id = Some("resp_123".to_string());
 
         assert!(request.validate().is_err());
     }
@@ -1644,15 +1597,17 @@ mod tests {
     }
 
     #[test]
-    fn response_create_request_new_sets_model() {
-        let request = ResponseCreateRequest::new("gpt-4.1");
+    fn response_create_request_builder_sets_model() {
+        let request = ResponseCreateRequest::builder().model("gpt-4.1").build();
         assert_eq!(request.model, "gpt-4.1");
         assert!(request.input.is_none());
     }
 
     #[test]
-    fn response_compact_request_new_sets_model() {
-        let request = ResponseCompactRequest::new("gpt-5.1-codex-max");
+    fn response_compact_request_builder_sets_model() {
+        let request = ResponseCompactRequest::builder()
+            .model("gpt-5.1-codex-max")
+            .build();
         assert_eq!(request.model, "gpt-5.1-codex-max");
         assert!(request.input.is_none());
     }

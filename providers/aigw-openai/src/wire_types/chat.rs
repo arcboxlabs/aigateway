@@ -1,10 +1,12 @@
+use bon::Builder;
 use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
 use super::shared::{JsonObject, OneOrMany, json_object_from_value, json_object_is_empty};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Builder)]
+#[builder(on(String, into))]
 pub struct ChatCompletionRequest {
     pub model: String,
     pub messages: Vec<ChatMessage>,
@@ -51,6 +53,7 @@ pub struct ChatCompletionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
     #[serde(flatten, default, skip_serializing_if = "json_object_is_empty")]
+    #[builder(default)]
     pub extra: JsonObject,
 }
 

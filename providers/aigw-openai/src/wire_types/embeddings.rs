@@ -1,8 +1,10 @@
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 
 use super::shared::{JsonObject, json_object_is_empty};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Builder)]
+#[builder(on(String, into))]
 pub struct EmbeddingRequest {
     pub model: String,
     pub input: EmbeddingInput,
@@ -13,6 +15,7 @@ pub struct EmbeddingRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
     #[serde(flatten, default, skip_serializing_if = "json_object_is_empty")]
+    #[builder(default)]
     pub extra: JsonObject,
 }
 
