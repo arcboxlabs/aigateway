@@ -1,0 +1,22 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+## [0.1.0](https://github.com/arcboxlabs/aigateway/compare/v0.0.1...v0.1.0) - 2026-04-05
+
+### Added
+- *(aigw)* add umbrella crate re-exporting all providers- *(aigw-openai)* Responses API wire types, transport improvements- *(aigw-anthropic)* transport layer, rate limits, split types modules- *(aigw-gemini)* scaffold Gemini provider crate
+
+### Refactored
+- *(anthropic)* replace hand-written builders with bon derive- *(aigw-openai)* replace hand-written constructors with bon builders- *(aigw-anthropic)* review fixes, SecretString, bon builder, docs
+
+### Documentation
+- add README with architecture diagram, provider logos, and CONTRIBUTING guide- *(aigw-openai-compat)* translate README from Chinese to English
+
+### Miscellaneous
+- add release-plz workflow and config for automated releases- update repository org from AprilNEA to arcboxlabs- add GitHub Actions workflow with check, test, fmt, clippy, audit
+
+### Init
+- workspace with openai, openai-compat, anthropic, gemini provider crates
+
+### Style
+- apply cargo fmt to aigw-gemini, update lockfile

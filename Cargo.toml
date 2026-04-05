@@ -10,7 +10,7 @@ resolver = "3"
 
 [package]
 name = "aigateway"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2024"
 description = "A unified AI Gateway for multiple LLM providers"
 license = "MIT"
