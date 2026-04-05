@@ -22,10 +22,13 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(600);
 #[derive(Debug, Clone, Builder)]
 #[builder(on(String, into))]
 pub struct ClientConfig {
+    /// Anthropic API key. Accepts `String` or `&str` via `Into<SecretString>`.
     #[builder(into)]
     pub api_key: SecretString,
+    /// Base URL for the API. Defaults to `https://api.anthropic.com`.
     #[builder(default = DEFAULT_BASE_URL.to_owned())]
     pub base_url: String,
+    /// API version header (`anthropic-version`). Defaults to `"2023-06-01"`.
     #[builder(default = DEFAULT_VERSION.to_owned())]
     pub version: String,
     /// Request timeout. Defaults to 600s (10 min) to accommodate long-running completions.

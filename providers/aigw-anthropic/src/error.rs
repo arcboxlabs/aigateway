@@ -2,31 +2,46 @@
 
 use crate::types::ApiError;
 
+/// Errors that can occur when using the Anthropic API client.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// HTTP transport error (connection, TLS, timeout via reqwest).
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
 
+    /// JSON serialization or deserialization error.
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
+    /// Anthropic API returned a structured error response.
     #[error("Anthropic API error ({status}): [{error_type}] {message}")]
     Api {
+        /// HTTP status code.
         status: u16,
+        /// Error type (e.g. `"invalid_request_error"`, `"rate_limit_error"`).
         error_type: String,
+        /// Human-readable error message.
         message: String,
     },
 
-    /// Non-JSON error response from the server (e.g. 502 HTML page).
+    /// Non-JSON error response from the server (e.g. 502 HTML page from a proxy).
     #[error("unexpected error response ({status}): {body}")]
-    UnexpectedResponse { status: u16, body: String },
+    UnexpectedResponse {
+        /// HTTP status code.
+        status: u16,
+        /// Raw response body.
+        body: String,
+    },
 
+    /// Error from the SSE stream parser.
     #[error("SSE stream error: {source}")]
     Stream {
+        /// The underlying stream error.
         #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
 
+    /// Invalid client configuration.
     #[error("invalid configuration: {0}")]
     Config(String),
 }
