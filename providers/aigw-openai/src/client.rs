@@ -344,6 +344,8 @@ mod tests {
     use tokio::net::{TcpListener, TcpStream};
     use tokio::sync::oneshot;
 
+    use secrecy::SecretString;
+
     use super::OpenAIClient;
     use crate::error::{OpenAIApiErrorKind, OpenAIError};
     use crate::transport::{HttpTransportConfig, OpenAIAuthConfig, OpenAITransportConfig};
@@ -361,7 +363,7 @@ mod tests {
                 default_headers: BTreeMap::from([("X-Default".to_owned(), "default".to_owned())]),
             },
             auth: OpenAIAuthConfig {
-                api_key: "sk-test".to_owned(),
+                api_key: SecretString::from("sk-test".to_owned()),
                 organization: Some("org_123".to_owned()),
                 project: Some("proj_456".to_owned()),
             },
@@ -738,8 +740,7 @@ mod tests {
             buffer.extend_from_slice(&chunk[..read]);
 
             if header_end.is_none()
-                && let Some(position) =
-                    buffer.windows(4).position(|window| window == b"\r\n\r\n")
+                && let Some(position) = buffer.windows(4).position(|window| window == b"\r\n\r\n")
             {
                 header_end = Some(position + 4);
                 let headers = String::from_utf8_lossy(&buffer[..position + 4]);

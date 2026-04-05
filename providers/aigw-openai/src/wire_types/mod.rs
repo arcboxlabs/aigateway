@@ -2,6 +2,7 @@ pub mod chat;
 pub mod embeddings;
 pub mod models;
 pub mod responses;
+pub mod responses_output;
 pub mod shared;
 
 pub use chat::{
@@ -17,11 +18,17 @@ pub use embeddings::{
 };
 pub use models::{Model, ModelListResponse};
 pub use responses::{
-    ResponseCompactRequest, ResponseCompaction, ResponseContentPart, ResponseContextManagement,
-    ResponseConversation, ResponseCreateRequest, ResponseCreateRequestError, ResponseInput,
-    ResponseInputItem, ResponseInputItemsPage, ResponseInputTokensRequest,
-    ResponseInputTokensResponse, ResponseObject, ResponseOutputItem, ResponsePromptCacheRetention,
-    ResponseReasoning, ResponseRetrieveStreamQuery, ResponseStreamEvent, ResponseStreamOptions,
-    ResponseTextConfig, ResponseTool, ResponseToolChoice, ResponseUsage,
+    ResponseAllowedToolsMode, ResponseCompactRequest, ResponseCompaction, ResponseContentPart,
+    ResponseContextManagement, ResponseConversation, ResponseCreateRequest,
+    ResponseCreateRequestError, ResponseInput, ResponseInputItem, ResponseInputItemsPage,
+    ResponseInputTokensRequest, ResponseInputTokensResponse, ResponseNamespaceTool, ResponseObject,
+    ResponseOutputItem, ResponsePromptCacheRetention, ResponseReasoning,
+    ResponseRetrieveStreamQuery, ResponseStreamEvent, ResponseStreamOptions, ResponseTextConfig,
+    ResponseTool, ResponseToolChoice, ResponseToolChoiceMode, ResponseUsage,
+};
+pub use responses_output::{
+    ResponseCodeInterpreterOutput, ResponseFileSearchResult, ResponseOutputTextAnnotation,
+    ResponseReasoningContentPart, ResponseReasoningSummaryPart, ResponseSafetyCheck,
+    ResponseShellAction, ResponseShellCallOutcome, ResponseShellCallOutputContent,
 };
 pub use shared::{ApiErrorBody, ApiErrorResponse, JsonObject, OneOrMany, json_object_is_empty};

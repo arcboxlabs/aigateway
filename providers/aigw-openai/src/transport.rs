@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 
+use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
+use serde::de::Deserializer;
 
 pub const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 600;
@@ -41,9 +43,10 @@ impl HttpTransportConfig {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct OpenAIAuthConfig {
-    pub api_key: String,
+    #[serde(deserialize_with = "deserialize_secret_string")]
+    pub api_key: SecretString,
     #[serde(default)]
     pub organization: Option<String>,
     #[serde(default)]
@@ -52,11 +55,11 @@ pub struct OpenAIAuthConfig {
 
 impl OpenAIAuthConfig {
     pub fn normalize(&mut self) -> Result<(), OpenAITransportConfigError> {
-        self.api_key = self.api_key.trim().to_owned();
-
-        if self.api_key.is_empty() {
+        let trimmed = self.api_key.expose_secret().trim().to_owned();
+        if trimmed.is_empty() {
             return Err(OpenAITransportConfigError::MissingApiKey);
         }
+        self.api_key = SecretString::from(trimmed);
 
         self.organization = self.organization.take().and_then(normalize_optional_field);
         self.project = self.project.take().and_then(normalize_optional_field);
@@ -75,7 +78,7 @@ impl Debug for OpenAIAuthConfig {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct OpenAITransportConfig {
     #[serde(flatten)]
     pub http: HttpTransportConfig,
@@ -94,7 +97,7 @@ impl OpenAITransportConfig {
         &self.http.base_url
     }
 
-    pub fn api_key(&self) -> &str {
+    pub fn api_key(&self) -> &SecretString {
         &self.auth.api_key
     }
 
@@ -128,7 +131,7 @@ impl Debug for OpenAITransportConfig {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct OpenAITransport {
     config: OpenAITransportConfig,
 }
@@ -143,7 +146,7 @@ impl OpenAITransport {
         self.config.base_url()
     }
 
-    pub fn api_key(&self) -> &str {
+    pub fn api_key(&self) -> &SecretString {
         self.config.api_key()
     }
 
@@ -176,7 +179,7 @@ impl OpenAITransport {
 
         headers.insert(
             "Authorization".to_owned(),
-            format!("Bearer {}", self.api_key()),
+            format!("Bearer {}", self.api_key().expose_secret()),
         );
 
         if let Some(organization) = self.organization() {
@@ -260,6 +263,14 @@ fn default_timeout_seconds() -> u64 {
     DEFAULT_TIMEOUT_SECONDS
 }
 
+fn deserialize_secret_string<'de, D>(deserializer: D) -> Result<SecretString, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Ok(SecretString::from(s))
+}
+
 fn normalize_optional_field(value: String) -> Option<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -284,6 +295,7 @@ mod tests {
         DEFAULT_OPENAI_BASE_URL, DEFAULT_TIMEOUT_SECONDS, HttpTransportConfig, OpenAIAuthConfig,
         OpenAITransport, OpenAITransportConfig,
     };
+    use secrecy::SecretString;
     use std::collections::BTreeMap;
 
     fn config() -> OpenAITransportConfig {
@@ -294,7 +306,7 @@ mod tests {
                 default_headers: BTreeMap::from([("X-Default".to_owned(), "default".to_owned())]),
             },
             auth: OpenAIAuthConfig {
-                api_key: " test-key ".to_owned(),
+                api_key: SecretString::from(" test-key ".to_owned()),
                 organization: Some(" org_123 ".to_owned()),
                 project: Some(" proj_456 ".to_owned()),
             },

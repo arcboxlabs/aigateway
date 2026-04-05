@@ -46,8 +46,10 @@ pub struct Embedding {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EmbeddingUsage {
-    pub prompt_tokens: u64,
-    pub total_tokens: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_tokens: Option<u64>,
     #[serde(flatten, default, skip_serializing_if = "json_object_is_empty")]
     pub extra: JsonObject,
 }

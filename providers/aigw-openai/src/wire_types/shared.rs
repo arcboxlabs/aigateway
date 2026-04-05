@@ -9,6 +9,13 @@ pub fn json_object_is_empty(value: &JsonObject) -> bool {
     value.is_empty()
 }
 
+pub fn json_object_from_value(value: Value) -> Result<JsonObject, &'static str> {
+    match value {
+        Value::Object(object) => Ok(object.into_iter().collect()),
+        _ => Err("expected JSON object"),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {

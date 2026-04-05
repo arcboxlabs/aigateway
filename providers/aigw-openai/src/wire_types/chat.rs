@@ -2,7 +2,7 @@ use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
-use super::shared::{JsonObject, OneOrMany, json_object_is_empty};
+use super::shared::{JsonObject, OneOrMany, json_object_from_value, json_object_is_empty};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChatCompletionRequest {
@@ -526,20 +526,13 @@ pub struct ChatStreamOptions {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChatUsage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prompt_tokens: Option<i64>,
+    pub prompt_tokens: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub completion_tokens: Option<i64>,
+    pub completion_tokens: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub total_tokens: Option<i64>,
+    pub total_tokens: Option<u64>,
     #[serde(flatten, default, skip_serializing_if = "json_object_is_empty")]
     pub extra: JsonObject,
-}
-
-fn json_object_from_value(value: Value) -> Result<JsonObject, &'static str> {
-    match value {
-        Value::Object(object) => Ok(object.into_iter().collect()),
-        _ => Err("expected JSON object"),
-    }
 }
 
 #[cfg(test)]

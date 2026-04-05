@@ -3,9 +3,10 @@ use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 
 use aigw_openai::{HttpTransportConfig, OpenAIAuthConfig, OpenAITransportConfigError};
+use secrecy::SecretString;
 use serde::Deserialize;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct OpenAICompatProvider {
     config: OpenAICompatConfig,
 }
@@ -24,7 +25,7 @@ impl OpenAICompatProvider {
         &self.config.http.base_url
     }
 
-    pub fn api_key(&self) -> &str {
+    pub fn api_key(&self) -> &SecretString {
         &self.config.auth.api_key
     }
 
@@ -54,7 +55,7 @@ impl Debug for OpenAICompatProvider {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct OpenAICompatConfig {
     pub name: String,
     #[serde(flatten)]
@@ -181,6 +182,7 @@ impl Error for OpenAICompatConfigError {}
 mod tests {
     use super::{OpenAICompatConfig, OpenAICompatConfigError, OpenAICompatProvider, Quirks};
     use aigw_openai::{HttpTransportConfig, OpenAIAuthConfig};
+    use secrecy::SecretString;
     use std::collections::BTreeMap;
 
     fn config() -> OpenAICompatConfig {
@@ -192,7 +194,7 @@ mod tests {
                 default_headers: BTreeMap::new(),
             },
             auth: OpenAIAuthConfig {
-                api_key: "test-key".to_owned(),
+                api_key: SecretString::from("test-key".to_owned()),
                 organization: None,
                 project: None,
             },
