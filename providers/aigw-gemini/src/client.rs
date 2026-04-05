@@ -40,10 +40,24 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    /// Normalize configuration values: trim whitespace, strip trailing slashes.
-    pub fn normalize(&mut self) {
+    /// Normalize and validate configuration values.
+    ///
+    /// Trims whitespace, strips trailing slashes, validates URL scheme and timeout.
+    pub fn normalize(&mut self) -> Result<(), Error> {
         self.base_url = self.base_url.trim().trim_end_matches('/').to_owned();
         self.api_version = self.api_version.trim().trim_end_matches('/').to_owned();
+
+        if self.base_url.is_empty() {
+            return Err(Error::Config("base_url is required".into()));
+        }
+        if !(self.base_url.starts_with("http://") || self.base_url.starts_with("https://")) {
+            return Err(Error::Config(format!("invalid base_url: {}", self.base_url)));
+        }
+        if self.timeout.is_zero() {
+            return Err(Error::Config("timeout must be greater than zero".into()));
+        }
+
+        Ok(())
     }
 }
 
@@ -64,7 +78,7 @@ impl Client {
     ///
     /// Calls [`ClientConfig::normalize`] before using the configuration.
     pub fn new(mut config: ClientConfig) -> Result<Self, Error> {
-        config.normalize();
+        config.normalize()?;
 
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));

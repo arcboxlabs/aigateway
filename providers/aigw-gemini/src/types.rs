@@ -224,6 +224,9 @@ pub struct Blob {
     pub mime_type: String,
     /// Base64-encoded bytes.
     pub data: String,
+    /// Forward-compatible catch-all.
+    #[serde(flatten, default)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// File reference by URI.
@@ -234,6 +237,9 @@ pub struct FileData {
     pub mime_type: String,
     /// Cloud Storage URI (`gs://`), HTTPS URL, YouTube URL, or Files API URI.
     pub file_uri: String,
+    /// Forward-compatible catch-all.
+    #[serde(flatten, default)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Function call from the model — a request to invoke a tool.
@@ -246,6 +252,9 @@ pub struct FunctionCall {
     /// Unique call ID. Always present in Gemini 3+ models; may be absent in older models.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    /// Forward-compatible catch-all.
+    #[serde(flatten, default)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Function response — the user's result for a function call.
@@ -258,6 +267,9 @@ pub struct FunctionResponse {
     /// Call ID (must match [`FunctionCall::id`] if present).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    /// Forward-compatible catch-all.
+    #[serde(flatten, default)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Code to execute via the code execution tool.
@@ -347,6 +359,9 @@ pub struct FunctionDeclaration {
     /// (e.g. `"STRING"`, `"OBJECT"`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parameters: Option<serde_json::Value>,
+    /// Forward-compatible catch-all.
+    #[serde(flatten, default)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Tool selection configuration.
@@ -642,6 +657,9 @@ pub struct UsageMetadata {
     /// Tokens used for thinking/reasoning.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thoughts_token_count: Option<u64>,
+    /// Forward-compatible catch-all.
+    #[serde(flatten, default)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 // ─── Safety Ratings ─────────────────────────────────────────────────────────
@@ -656,6 +674,9 @@ pub struct SafetyRating {
     /// Whether this rating caused the content to be blocked.
     #[serde(default)]
     pub blocked: bool,
+    /// Forward-compatible catch-all.
+    #[serde(flatten, default)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Probability level for a safety rating.
@@ -732,6 +753,9 @@ pub struct Citation {
     pub title: Option<String>,
     /// License information.
     pub license: Option<String>,
+    /// Forward-compatible catch-all.
+    #[serde(flatten, default)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 // ─── Grounding ──────────────────────────────────────────────────────────────
