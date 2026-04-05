@@ -27,6 +27,7 @@ dependencies = [
  "bytes",
  "eventsource-stream",
  "futures",
+ "futures-util",
  "reqwest",
  "secrecy",
  "serde",
@@ -57,6 +58,7 @@ dependencies = [
 name = "aigw-openai"
 version = "0.0.1"
 dependencies = [
+ "bon",
  "bytes",
  "eventsource-stream",
  "futures-core",

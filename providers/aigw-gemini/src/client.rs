@@ -89,8 +89,7 @@ impl Client {
 
     /// Create a client from the `GOOGLE_API_KEY` environment variable.
     pub fn from_env() -> Result<Self, Error> {
-        let api_key =
-            std::env::var("GOOGLE_API_KEY").map_err(|e| Error::Config(e.to_string()))?;
+        let api_key = std::env::var("GOOGLE_API_KEY").map_err(|e| Error::Config(e.to_string()))?;
         Self::new(ClientConfig::builder().api_key(api_key).build())
     }
 

@@ -137,7 +137,6 @@ pub enum Role {
 #[serde(rename_all = "camelCase")]
 pub struct Part {
     // ── Content fields (exactly one should be present) ──
-
     /// Plain text content.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
@@ -161,7 +160,6 @@ pub struct Part {
     pub code_execution_result: Option<CodeExecutionResult>,
 
     // ── Metadata (can co-exist with content fields) ──
-
     /// Whether this part is a thinking/reasoning step.
     /// Present in Gemini 2.5+ when thinking is enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
