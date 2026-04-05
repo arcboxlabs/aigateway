@@ -6,6 +6,13 @@ version = 4
 name = "aigateway"
 version = "0.0.1"
 dependencies = [
+ "aigw",
+]
+
+[[package]]
+name = "aigw"
+version = "0.0.1"
+dependencies = [
  "aigw-anthropic",
  "aigw-gemini",
  "aigw-openai",
@@ -32,6 +39,19 @@ dependencies = [
 [[package]]
 name = "aigw-gemini"
 version = "0.0.1"
+dependencies = [
+ "bon",
+ "bytes",
+ "eventsource-stream",
+ "futures",
+ "reqwest",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
 
 [[package]]
 name = "aigw-openai"
@@ -42,6 +62,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "reqwest",
+ "secrecy",
  "serde",
  "serde_json",
  "thiserror",
@@ -53,6 +74,7 @@ name = "aigw-openai-compat"
 version = "0.0.1"
 dependencies = [
  "aigw-openai",
+ "secrecy",
  "serde",
  "serde_json",
 ]

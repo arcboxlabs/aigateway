@@ -1,0 +1,20 @@
+[package]
+name = "aigw"
+version = "0.0.1"
+edition = "2024"
+description = "Umbrella crate re-exporting all AI Gateway provider clients"
+license = "MIT"
+repository = "https://github.com/arcboxlabs/aigateway"
+
+[features]
+default = ["openai", "openai-compat", "anthropic", "gemini"]
+openai = ["dep:aigw-openai"]
+openai-compat = ["dep:aigw-openai-compat", "openai"]
+anthropic = ["dep:aigw-anthropic"]
+gemini = ["dep:aigw-gemini"]
+
+[dependencies]
+aigw-openai = { version = "0.0.1", path = "../aigw-openai", optional = true }
+aigw-openai-compat = { version = "0.0.1", path = "../aigw-openai-compat", optional = true }
+aigw-anthropic = { version = "0.0.1", path = "../aigw-anthropic", optional = true }
+aigw-gemini = { version = "0.0.1", path = "../aigw-gemini", optional = true }
