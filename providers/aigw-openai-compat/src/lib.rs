@@ -1,3 +1,5 @@
+pub mod translate;
+
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -43,6 +45,14 @@ impl OpenAICompatProvider {
 
     pub fn default_headers(&self) -> &BTreeMap<String, String> {
         &self.config.http.default_headers
+    }
+
+    pub fn http_config(&self) -> &HttpTransportConfig {
+        &self.config.http
+    }
+
+    pub fn auth_config(&self) -> &OpenAIAuthConfig {
+        &self.config.auth
     }
 }
 

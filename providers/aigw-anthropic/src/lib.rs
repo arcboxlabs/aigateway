@@ -40,6 +40,7 @@ pub mod client;
 pub mod error;
 pub mod rate_limit;
 pub mod streaming;
+pub mod translate;
 pub mod transport;
 pub mod types;
 

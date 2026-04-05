@@ -11,7 +11,9 @@ default = []
 claude-code = []
 
 [dependencies]
+aigw-core = { workspace = true }
 bon = "3"
+http = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", features = ["json", "stream"] }

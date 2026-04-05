@@ -7,8 +7,11 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+aigw-core = { workspace = true }
 bon = "3"
 bytes = "1"
+http = "1"
+strum = { version = "0.28", features = ["derive"] }
 eventsource-stream = "0.2"
 futures-core = "0.3"
 futures-util = "0.3"
