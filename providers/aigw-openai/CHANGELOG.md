@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.3.0](https://github.com/arcboxlabs/aigateway/compare/aigw-openai-v0.2.0...aigw-openai-v0.3.0) - 2026-04-15
+
+### Added
+- *(aigw-openai)* add Responses API translation layer with Codex support
+
+### Style
+- apply nightly cargo fmt to new responses translation modules
+
 ## [0.2.0](https://github.com/arcboxlabs/aigateway/compare/aigw-openai-v0.1.0...aigw-openai-v0.2.0) - 2026-04-05
 
 ### Added

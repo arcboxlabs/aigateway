@@ -1,6 +1,7 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
 ## [0.2.0](https://github.com/arcboxlabs/aigateway/compare/aigw-anthropic-v0.1.0...aigw-anthropic-v0.2.0) - 2026-04-05
 
 ### Added
