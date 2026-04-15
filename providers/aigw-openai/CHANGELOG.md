@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.4.0](https://github.com/arcboxlabs/aigateway/compare/aigw-openai-v0.3.0...aigw-openai-v0.4.0) - 2026-04-15
+
+### Added
+- *(aigw-openai)* expose build_responses_create_request for library consumers
+
 ## [0.3.0](https://github.com/arcboxlabs/aigateway/compare/aigw-openai-v0.2.0...aigw-openai-v0.3.0) - 2026-04-15
 
 ### Added
