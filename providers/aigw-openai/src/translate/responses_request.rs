@@ -337,8 +337,11 @@ fn chat_request_to_responses(
         .extra
         .get("include")
         .and_then(|v| {
-            v.as_array()
-                .map(|a| a.iter().filter_map(|s| s.as_str().map(String::from)).collect())
+            v.as_array().map(|a| {
+                a.iter()
+                    .filter_map(|s| s.as_str().map(String::from))
+                    .collect()
+            })
         })
         .or_else(|| config.default_include.clone());
 
@@ -562,12 +565,10 @@ fn translate_tool_choice(tc: &ToolChoice) -> ResponseToolChoice {
             let s = mode.to_string();
             ResponseToolChoice::Mode(ResponseToolChoiceMode::from(s))
         }
-        ToolChoice::Named(named) => {
-            ResponseToolChoice::Typed(TypedResponseToolChoice::Function {
-                name: named.function.name.clone(),
-                extra: Default::default(),
-            })
-        }
+        ToolChoice::Named(named) => ResponseToolChoice::Typed(TypedResponseToolChoice::Function {
+            name: named.function.name.clone(),
+            extra: Default::default(),
+        }),
         ToolChoice::Raw(obj) => ResponseToolChoice::Raw(obj.clone()),
     }
 }
@@ -708,7 +709,10 @@ mod tests {
         let mut req = minimal_request();
         req.messages.retain(|m| m.role != Role::System);
         let resp = chat_request_to_responses(&req, &codex_config()).unwrap();
-        assert_eq!(resp.instructions, Some(serde_json::Value::String("".into())));
+        assert_eq!(
+            resp.instructions,
+            Some(serde_json::Value::String("".into()))
+        );
     }
 
     #[test]
@@ -826,7 +830,10 @@ mod tests {
         let items = resp.input.unwrap();
         let items = items.as_array().unwrap();
         assert_eq!(items[0]["role"], "developer");
-        assert_eq!(resp.instructions, Some(serde_json::Value::String("".into())));
+        assert_eq!(
+            resp.instructions,
+            Some(serde_json::Value::String("".into()))
+        );
     }
 
     // ── Drop flags ──────────────────────────────────────────────────────

@@ -82,7 +82,6 @@ impl StreamParser for ResponsesStreamParser {
             }
 
             // ── Reasoning events ────────────────────────────────────────
-
             "response.output_item.added"
                 if ev.pointer("/item/type").and_then(|v| v.as_str()) == Some("reasoning") =>
             {
@@ -115,7 +114,6 @@ impl StreamParser for ResponsesStreamParser {
             }
 
             // ── Content events ──────────────────────────────────────────
-
             "response.output_text.delta" => {
                 let delta = ev["delta"].as_str().unwrap_or("").to_owned();
                 if !delta.is_empty() {
@@ -124,10 +122,8 @@ impl StreamParser for ResponsesStreamParser {
             }
 
             // ── Tool call events ────────────────────────────────────────
-
             "response.output_item.added"
-                if ev.pointer("/item/type").and_then(|v| v.as_str())
-                    == Some("function_call") =>
+                if ev.pointer("/item/type").and_then(|v| v.as_str()) == Some("function_call") =>
             {
                 // Flush pending reasoning signature before tool calls start.
                 if let Some(sig) = self.flush_signature() {
@@ -161,7 +157,6 @@ impl StreamParser for ResponsesStreamParser {
             }
 
             // ── Completion ──────────────────────────────────────────────
-
             "response.completed" => {
                 let status = ev
                     .pointer("/response/status")
@@ -298,7 +293,10 @@ mod tests {
         let events = p.parse_event("", tc).unwrap();
         assert_eq!(events.len(), 2);
         assert!(matches!(&events[0], StreamEvent::ReasoningSignature(s) if s == "sig_xyz"));
-        assert!(matches!(&events[1], StreamEvent::ToolCallStart { index: 0, .. }));
+        assert!(matches!(
+            &events[1],
+            StreamEvent::ToolCallStart { index: 0, .. }
+        ));
     }
 
     #[test]
@@ -339,7 +337,10 @@ mod tests {
 
         let events = p.parse_event("", data).unwrap();
         assert_eq!(events.len(), 3);
-        assert!(matches!(&events[0], StreamEvent::Finish(FinishReason::Stop)));
+        assert!(matches!(
+            &events[0],
+            StreamEvent::Finish(FinishReason::Stop)
+        ));
         assert!(matches!(&events[1], StreamEvent::Usage(u) if u.prompt_tokens == Some(10)));
         assert!(matches!(&events[2], StreamEvent::Done));
     }

@@ -164,10 +164,7 @@ fn response_object_to_chat_response(resp: ResponseObject) -> ChatResponse {
     // round-trips back to clients that understand it.
     let mut msg_extra = serde_json::Map::new();
     if let Some(r) = reasoning_text {
-        msg_extra.insert(
-            "reasoning_content".into(),
-            serde_json::Value::String(r),
-        );
+        msg_extra.insert("reasoning_content".into(), serde_json::Value::String(r));
     }
 
     ChatResponse {
@@ -359,7 +356,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            resp.choices[0].message.extra.get("reasoning_content").unwrap(),
+            resp.choices[0]
+                .message
+                .extra
+                .get("reasoning_content")
+                .unwrap(),
             "Thinking about it..."
         );
     }

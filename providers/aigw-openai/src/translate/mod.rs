@@ -19,9 +19,7 @@ mod stream;
 
 pub use request::OpenAIRequestTranslator;
 pub use response::OpenAIResponseTranslator;
-pub use responses_request::{
-    ResponsesRequestConfig, ResponsesRequestTranslator, SystemHandling,
-};
+pub use responses_request::{ResponsesRequestConfig, ResponsesRequestTranslator, SystemHandling};
 pub use responses_response::ResponsesResponseTranslator;
 pub use responses_stream::ResponsesStreamParser;
 pub use stream::OpenAIStreamParser;
