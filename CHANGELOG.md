@@ -1,6 +1,20 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.3.0](https://github.com/arcboxlabs/aigateway/compare/v0.2.0...v0.3.0) - 2026-04-15
+
+### Added
+- *(aigw-openai)* add Responses API translation layer with Codex support
+
+### Documentation
+- add Responses API translation reference and update design notes
+
+### Miscellaneous
+- *(release-plz)* disable semver_check during 0.x rapid iteration
+
+### Style
+- apply nightly cargo fmt to new responses translation modules
+
 ## [0.2.0](https://github.com/arcboxlabs/aigateway/compare/v0.1.0...v0.2.0) - 2026-04-05
 
 ### Added
