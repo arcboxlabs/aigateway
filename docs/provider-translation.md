@@ -11,6 +11,80 @@ Near-passthrough. The unified format **is** the OpenAI format, so no translation
 - SSE stream parsing (`data: {...}` lines, `data: [DONE]` terminator)
 - Response deserialization into unified types
 
+### `aigw-openai` — Responses API Translation
+
+Translates canonical Chat Completions format ↔ OpenAI Responses API (`/v1/responses`). Used when the gateway receives Chat Completions requests but needs to forward them via the Responses API (e.g. for Codex CLI compatibility, or when Responses API features like `previous_response_id` are needed).
+
+#### Request Translation (Chat Completions → Responses API)
+
+| Chat Completions | Responses API | Notes |
+|---|---|---|
+| `model` | `model` | Direct |
+| `messages` (role: system/developer) | `instructions` **or** `input[]` role: developer | `SystemHandling::ExtractToInstructions` (default) vs `MapToDeveloper` |
+| `messages` (role: user) | `input[]: { type: "message", role: "user", content: [...] }` | Content parts: `text` → `input_text`, `image_url` → `input_image` |
+| `messages` (role: assistant) | `input[]: { type: "message", role: "assistant", content: [...] }` | Content parts: `text` → `output_text` |
+| `messages` (role: assistant + tool_calls) | `input[]: { type: "function_call", call_id, name, arguments }` | Each tool_call becomes a separate input item |
+| `messages` (role: tool) | `input[]: { type: "function_call_output", call_id, output }` | |
+| `max_tokens` | `max_output_tokens` | Dropped when `drop_max_tokens = true` (Codex backend) |
+| `temperature` | `temperature` | Dropped when `drop_temperature = true` |
+| `top_p` | `top_p` | Dropped when `drop_top_p = true` |
+| `tools[].function` | `tools[]: { type: "function", name, description, parameters, strict }` | Flattened (no nested `function` wrapper) |
+| `tool_choice` | `tool_choice` | Named: `{ type: "function", function: { name } }` → `{ type: "function", name }` |
+| `reasoning_effort` (extra) | `reasoning.effort` | Chat Completions shorthand |
+| `reasoning` (extra, object) | `reasoning` | Pass-through, merged with `reasoning_effort` |
+| `response_format: { type: "json_schema", json_schema: {...} }` | `text.format: { type: "json_schema", name, schema, strict }` | Fields flattened to top level |
+| `store` (extra) | `store` | Falls back to `default_store` config |
+| `include` (extra) | `include` | Falls back to `default_include` config |
+| `parallel_tool_calls` (extra) | `parallel_tool_calls` | Falls back to `default_parallel_tool_calls` config |
+
+#### `ResponsesRequestConfig` Presets
+
+| Config | Public API (`Default`) | Codex backend (`::codex()`) |
+|---|---|---|
+| `system_handling` | `ExtractToInstructions` | `MapToDeveloper` |
+| `drop_max_tokens` | `false` | `true` |
+| `drop_temperature` | `false` | `true` |
+| `drop_top_p` | `false` | `true` |
+| `default_store` | `None` | `Some(false)` |
+| `default_include` | `None` | `Some(["reasoning.encrypted_content"])` |
+| `default_parallel_tool_calls` | `None` | `Some(true)` |
+| `default_reasoning_summary` | `None` | `Some("auto")` |
+| `default_reasoning_effort` | `None` | `Some("medium")` |
+| `force_instructions` | `false` | `true` |
+| `max_tool_name_len` | `None` | `Some(64)` |
+
+#### Response Translation (Responses API → Chat Completions)
+
+| Responses API | Chat Completions | Notes |
+|---|---|---|
+| `id` | `id` | Direct |
+| `model` | `model` | Direct |
+| `created_at` | `created` | Direct |
+| `output[type=message].content[type=output_text]` | `choices[0].message.content` | Concatenated |
+| `output[type=function_call]` | `choices[0].message.tool_calls[]` | `call_id` → `id`, flattened to `{ id, type: "function", function: { name, arguments } }` |
+| `output[type=reasoning].summary[type=summary_text]` | `choices[0].message.extra.reasoning_content` | Via Message.extra flatten |
+| `status: "completed"` | `finish_reason: "stop"` / `"tool_calls"` | `tool_calls` if any function_call items |
+| `status: "incomplete"` | `finish_reason: "length"` | |
+| `usage.input_tokens` | `usage.prompt_tokens` | |
+| `usage.output_tokens` | `usage.completion_tokens` | |
+| `usage.input_tokens_details` | `usage.extra.prompt_tokens_details` | |
+| `usage.output_tokens_details` | `usage.extra.completion_tokens_details` | |
+
+#### Streaming Translation (Responses API SSE → Canonical StreamEvent)
+
+| Responses API SSE event | StreamEvent |
+|---|---|
+| `response.created` | `ResponseMeta { id, model }` |
+| `response.output_text.delta` | `ContentDelta(text)` |
+| `response.reasoning_summary_text.delta` | `ReasoningDelta(text)` |
+| `response.reasoning_summary_text.done` | `ReasoningDelta("\n\n")` (segment separator) |
+| `response.output_item.added` (type: reasoning) | Buffer `encrypted_content` |
+| `response.output_item.done` (type: reasoning) | `ReasoningSignature(encrypted_content)` |
+| `response.output_item.added` (type: function_call) | `ToolCallStart { index, id, name }` (flushes buffered signature first) |
+| `response.function_call_arguments.delta` | `ToolCallDelta { index, arguments }` |
+| `response.completed` | `Finish(reason)` + `Usage(...)` + `Done` |
+| `[DONE]` | `Done` |
+
 ### `aigw-openai-compat` — OpenAI-Compatible Third Parties
 
 Same wire format as OpenAI, but configurable:

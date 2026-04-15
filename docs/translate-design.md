@@ -89,11 +89,26 @@ impl RequestTranslator for AnthropicRequestTranslator {
 
 ## Per-Provider Complexity
 
-### OpenAI — Near Passthrough
-- Canonical format IS OpenAI format → minimal translation.
-- `translate/` could even be a single `translate.rs` file.
+### OpenAI — Two Translation Paths
+
+OpenAI has two first-class APIs that require independent translators:
+
+**Chat Completions (`/v1/chat/completions`)** — Near-passthrough:
+- Canonical format IS Chat Completions format → minimal translation.
 - Main work: build URL, set auth headers, serialize body.
-- No `tools.rs` needed — tool format is already canonical.
+- Implementation: `OpenAIRequestTranslator`, `OpenAIResponseTranslator`, `OpenAIStreamParser`.
+
+**Responses API (`/v1/responses`)** — Cross-format translation:
+- Converts canonical (Chat Completions format) ↔ Responses API (`input` + `instructions` object model).
+- Messages → typed input items (`message`, `function_call`, `function_call_output`).
+- System/developer messages → top-level `instructions` string (or stay as input items with role `developer`, configurable).
+- `tools[].function` unwrapped and flattened (no nested `function` wrapper).
+- `response_format` → `text.format` with `json_schema` field flattening.
+- `reasoning_effort` shorthand → nested `reasoning.effort`.
+- Stateful stream parser: tracks `tool_call_index`, buffers reasoning `encrypted_content` → emits `ReasoningSignature` on block done.
+- Implementation: `ResponsesRequestTranslator`, `ResponsesResponseTranslator`, `ResponsesStreamParser`.
+- Behaviour controlled by [`ResponsesRequestConfig`], which exposes backend-specific flags (`drop_max_tokens`, `system_handling`, `default_store`, `default_reasoning_effort`, etc.) so the same translator can target the public OpenAI API or private backends like Codex (`chatgpt.com/backend-api/codex/responses`) without forking.
+- Use `ResponsesRequestConfig::codex()` preset to match the Codex CLI behaviour (matches upstream `CLIProxyAPI`).
 
 ### Anthropic — Most Complex
 - System message extraction (from messages array → top-level `system` field)
