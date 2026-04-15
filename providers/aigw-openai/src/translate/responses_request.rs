@@ -227,6 +227,25 @@ impl RequestTranslator for ResponsesRequestTranslator {
     }
 }
 
+/// Build a [`ResponseCreateRequest`] from a canonical [`ChatRequest`] and a
+/// [`ResponsesRequestConfig`], without constructing an [`OpenAITransport`].
+///
+/// Use this when you only need the translated body (for example, as a
+/// downstream gateway that handles HTTP dispatch itself). For the full
+/// `TranslatedRequest` with URL/headers included, use
+/// [`ResponsesRequestTranslator`].
+///
+/// # Errors
+///
+/// Returns [`TranslateError`] if any field in `req` fails to translate (for
+/// example, invalid `response_format` shape).
+pub fn build_responses_create_request(
+    req: &ChatRequest,
+    config: &ResponsesRequestConfig,
+) -> Result<ResponseCreateRequest, TranslateError> {
+    chat_request_to_responses(req, config)
+}
+
 /// Core conversion: `ChatRequest` → `ResponseCreateRequest`.
 fn chat_request_to_responses(
     req: &ChatRequest,
@@ -980,5 +999,45 @@ mod tests {
             .insert("parallel_tool_calls".into(), serde_json::Value::Bool(false));
         let resp = chat_request_to_responses(&req, &codex_config()).unwrap();
         assert_eq!(resp.parallel_tool_calls, Some(false));
+    }
+
+    // ── build_responses_create_request public API ───────────────────────
+
+    #[test]
+    fn build_responses_create_request_is_equivalent_to_internal() {
+        // The public function is a thin wrapper; verify it produces the same
+        // ResponseCreateRequest as the internal function.
+        let req = minimal_request();
+        let internal = chat_request_to_responses(&req, &codex_config()).unwrap();
+        let public = super::build_responses_create_request(&req, &codex_config()).unwrap();
+        assert_eq!(
+            serde_json::to_value(&internal).unwrap(),
+            serde_json::to_value(&public).unwrap()
+        );
+    }
+
+    #[test]
+    fn build_responses_create_request_codex_preset_fields() {
+        // End-to-end check of the codex preset via the public API: verifies
+        // all the key Codex-specific defaults are set without needing a
+        // full OpenAITransport.
+        let resp =
+            super::build_responses_create_request(&minimal_request(), &codex_config()).unwrap();
+        assert_eq!(resp.store, Some(false));
+        assert_eq!(resp.parallel_tool_calls, Some(true));
+        assert_eq!(
+            resp.include,
+            Some(vec!["reasoning.encrypted_content".into()])
+        );
+        assert_eq!(resp.max_output_tokens, None); // drop_max_tokens
+        assert_eq!(resp.temperature, None); // drop_temperature
+        assert_eq!(resp.top_p, None); // drop_top_p
+        assert_eq!(
+            resp.instructions,
+            Some(serde_json::Value::String("".into()))
+        ); // force_instructions
+        let reasoning = resp.reasoning.unwrap();
+        assert_eq!(reasoning["effort"], "medium");
+        assert_eq!(reasoning["summary"], "auto");
     }
 }
