@@ -36,6 +36,14 @@ pub enum StreamEvent {
     /// Incremental text content.
     ContentDelta(String),
 
+    /// Incremental reasoning/thinking summary text (e.g. from reasoning models
+    /// like o3, o4-mini via the Responses API `response.reasoning_summary_text.delta`).
+    ReasoningDelta(String),
+
+    /// Opaque reasoning signature emitted when a reasoning block finalizes.
+    /// Must be preserved exactly for subsequent turns.
+    ReasoningSignature(String),
+
     /// A new tool call begins.
     ///
     /// `index` is the zero-based position in the `tool_calls` array.
