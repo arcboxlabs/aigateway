@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0](https://github.com/arcboxlabs/aigateway/compare/aigw-anthropic-v0.4.0...aigw-anthropic-v0.5.0) - 2026-05-14
+
+### Added
+- *(aigw-anthropic)* pluggable cache_control strategy + always-on API rules- *(aigw-anthropic)* wire canonical thinking + source-tagged history filter
+
+### Miscellaneous
+- fix CI — clippy + nightly rustfmt
+
 ## [0.2.0](https://github.com/arcboxlabs/aigateway/compare/aigw-anthropic-v0.1.0...aigw-anthropic-v0.2.0) - 2026-04-05
 
 ### Added

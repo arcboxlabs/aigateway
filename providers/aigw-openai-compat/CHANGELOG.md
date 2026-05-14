@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0](https://github.com/arcboxlabs/aigateway/compare/aigw-openai-compat-v0.4.0...aigw-openai-compat-v0.5.0) - 2026-05-14
+
+### Added
+- *(aigw-gemini)* add translate module + canonical thinking projector
+
 ## [0.2.0](https://github.com/arcboxlabs/aigateway/compare/aigw-openai-compat-v0.0.1...aigw-openai-compat-v0.2.0) - 2026-04-05
 
 ### Added

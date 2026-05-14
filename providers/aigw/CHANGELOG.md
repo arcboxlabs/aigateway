@@ -1,6 +1,17 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.5.0](https://github.com/arcboxlabs/aigateway/compare/aigw-v0.4.0...aigw-v0.5.0) - 2026-05-14
+
+### Added
+- *(aigw-openai)* Chat Completions thinking projector + Value-level helper- *(aigw-openai)* wire canonical thinking + ReasoningStart/End in Responses- *(aigw-openai)* normalize web_search_preview tool aliases for Codex- *(aigw-gemini)* add translate module + canonical thinking projector- *(aigw-anthropic)* pluggable cache_control strategy + always-on API rules- *(aigw-anthropic)* wire canonical thinking + source-tagged history filter- *(aigw-gemini)* GenerateContentRequest also derives Deserialize- *(aigw-gemini)* native-protocol bridge (Gemini-native ↔ canonical)- *(aigw-gemini)* expose build_generate_content_request public helper
+
+### Fixed
+- *(aigw-gemini)* schema-type case + native-bridge fidelity
+
+### Miscellaneous
+- fix CI — clippy + nightly rustfmt
+
 ## [0.4.0](https://github.com/arcboxlabs/aigateway/compare/aigw-v0.3.0...aigw-v0.4.0) - 2026-04-15
 
 ### Added

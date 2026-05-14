@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0](https://github.com/arcboxlabs/aigateway/compare/aigw-gemini-v0.4.0...aigw-gemini-v0.5.0) - 2026-05-14
+
+### Added
+- *(aigw-gemini)* GenerateContentRequest also derives Deserialize- *(aigw-gemini)* native-protocol bridge (Gemini-native ↔ canonical)- *(aigw-gemini)* expose build_generate_content_request public helper- *(aigw-gemini)* add translate module + canonical thinking projector
+
+### Fixed
+- *(aigw-gemini)* schema-type case + native-bridge fidelity
+
 ## [0.2.0](https://github.com/arcboxlabs/aigateway/compare/aigw-gemini-v0.1.0...aigw-gemini-v0.2.0) - 2026-04-05
 
 ### Fixed

@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.5.0](https://github.com/arcboxlabs/aigateway/compare/aigw-openai-v0.4.0...aigw-openai-v0.5.0) - 2026-05-14
+
+### Added
+- *(aigw-openai)* Chat Completions thinking projector + Value-level helper- *(aigw-openai)* wire canonical thinking + ReasoningStart/End in Responses- *(aigw-openai)* normalize web_search_preview tool aliases for Codex
+
+### Miscellaneous
+- fix CI — clippy + nightly rustfmt
+
 ## [0.4.0](https://github.com/arcboxlabs/aigateway/compare/aigw-openai-v0.3.0...aigw-openai-v0.4.0) - 2026-04-15
 
 ### Added
