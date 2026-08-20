@@ -122,13 +122,13 @@ pub struct Metadata {
 /// A conversation message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
-    /// Message role — only `user` or `assistant` (no `system`).
+    /// Message role.
     pub role: Role,
     /// Message content — plain string or array of content blocks.
     pub content: MessageContent,
 }
 
-/// Message role. Anthropic only supports `user` and `assistant` in messages.
+/// Message role.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
@@ -136,6 +136,8 @@ pub enum Role {
     User,
     /// Assistant message.
     Assistant,
+    /// Inline system message accepted from newer Claude Code clients.
+    System,
 }
 
 /// Content can be a plain string or an array of content blocks.

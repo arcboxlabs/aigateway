@@ -122,6 +122,18 @@ pub fn messages_request_to_canonical(req: MessagesRequest) -> Result<ChatRequest
                         });
                     }
                 }
+                AnthropicRole::System => {
+                    if let Some(content) = user_blocks_to_content(blocks) {
+                        messages.push(Message {
+                            role: Role::System,
+                            content: Some(content),
+                            name: None,
+                            tool_call_id: None,
+                            tool_calls: None,
+                            extra: Default::default(),
+                        });
+                    }
+                }
             },
         }
     }
@@ -172,6 +184,7 @@ const fn canonical_role(role: AnthropicRole) -> Role {
     match role {
         AnthropicRole::User => Role::User,
         AnthropicRole::Assistant => Role::Assistant,
+        AnthropicRole::System => Role::System,
     }
 }
 
@@ -1197,6 +1210,42 @@ mod tests {
         let canonical = messages_request_to_canonical(req).unwrap();
         assert_eq!(canonical.messages[0].role, Role::System);
         assert_eq!(canonical.messages[1].role, Role::User);
+    }
+
+    #[test]
+    fn request_deserializes_inline_system_messages() {
+        let json = r#"{
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 1024,
+            "system": "top-level instructions",
+            "messages": [
+                { "role": "system", "content": "inline instructions" },
+                {
+                    "role": "system",
+                    "content": [{ "type": "text", "text": "block instructions" }]
+                },
+                { "role": "user", "content": "hi" }
+            ]
+        }"#;
+        let req: MessagesRequest = serde_json::from_str(json).unwrap();
+        let canonical = messages_request_to_canonical(req).unwrap();
+
+        assert_eq!(
+            canonical
+                .messages
+                .iter()
+                .map(|message| message.role.clone())
+                .collect::<Vec<_>>(),
+            [Role::System, Role::System, Role::System, Role::User]
+        );
+        assert!(matches!(
+            &canonical.messages[1].content,
+            Some(MessageContent::Text(text)) if text == "inline instructions"
+        ));
+        assert!(matches!(
+            &canonical.messages[2].content,
+            Some(MessageContent::Text(text)) if text == "block instructions"
+        ));
     }
 
     // ── chat_response_to_messages ────────────────────────────────────────

@@ -24,6 +24,7 @@ use tokio::net::TcpListener;
 struct Recorded {
     model: Option<String>,
     authorization: Option<String>,
+    messages: Option<Value>,
 }
 
 type Recorder = Arc<Mutex<Recorded>>;
@@ -75,6 +76,7 @@ fn record(state: &MockState, headers: &axum::http::HeaderMap, body: &Bytes) -> b
     let v: Value = serde_json::from_slice(body).expect("upstream body is JSON");
     let mut rec = state.recorder.lock().unwrap();
     rec.model = v["model"].as_str().map(str::to_owned);
+    rec.messages = Some(v["messages"].clone());
     rec.authorization = headers
         .get(header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
@@ -297,6 +299,52 @@ async fn unary_produces_anthropic_message() {
     assert_eq!(v["usage"]["output_tokens"], 4);
     // The response echoes the requested Anthropic model, not the upstream's.
     assert_eq!(v["model"], "claude-sonnet-4-20250514");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn inline_system_messages_reach_upstream_and_count_tokens() {
+    let (upstream_base, recorder) = spawn_mock_upstream(STREAM_SSE).await;
+    let gateway = spawn_gateway(upstream_base, Wire::OpenaiChat).await;
+    let body = serde_json::json!({
+        "model": "claude-sonnet-4-20250514",
+        "max_tokens": 256,
+        "system": "top-level instructions",
+        "messages": [
+            { "role": "system", "content": "inline instructions" },
+            {
+                "role": "system",
+                "content": [{ "type": "text", "text": "block instructions" }]
+            },
+            { "role": "user", "content": "hi" }
+        ]
+    });
+
+    let count_resp = client()
+        .post(format!("{gateway}/v1/messages/count_tokens"))
+        .json(&body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(count_resp.status(), reqwest::StatusCode::OK);
+
+    let resp = client()
+        .post(format!("{gateway}/v1/messages"))
+        .json(&body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), reqwest::StatusCode::OK);
+
+    let rec = recorder.lock().unwrap();
+    assert_eq!(
+        rec.messages,
+        Some(serde_json::json!([
+            { "role": "system", "content": "top-level instructions" },
+            { "role": "system", "content": "inline instructions" },
+            { "role": "system", "content": "block instructions" },
+            { "role": "user", "content": "hi" }
+        ]))
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
