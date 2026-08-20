@@ -4,7 +4,7 @@
 //! See <https://docs.anthropic.com/en/api/messages>
 
 use bon::Builder;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 // ─── Request ─────────────────────────────────────────────────────────────────
 
@@ -129,15 +129,32 @@ pub struct Message {
 }
 
 /// Message role.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     /// User message.
     User,
     /// Assistant message.
     Assistant,
-    /// Inline system message accepted from newer Claude Code clients.
+    /// Inline system message accepted when deserializing requests from newer
+    /// Claude Code clients. Anthropic's upstream API requires clients to move
+    /// this content to the top-level `system` field before serialization.
     System,
+}
+
+impl Serialize for Role {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::User => serializer.serialize_str("user"),
+            Self::Assistant => serializer.serialize_str("assistant"),
+            Self::System => Err(serde::ser::Error::custom(
+                "role `system` is inbound-only; move its content to the top-level `system` field",
+            )),
+        }
+    }
 }
 
 /// Content can be a plain string or an array of content blocks.

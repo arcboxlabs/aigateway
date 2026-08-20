@@ -14,8 +14,9 @@ use crate::rate_limit::{ApiResponse, RateLimitInfo};
 use crate::streaming::parse_sse_stream;
 use crate::transport::Transport;
 use crate::types::{
-    ApiErrorResponse, CountTokensRequest, CountTokensResponse, MessagesRequest, MessagesResponse,
-    ModelListResponse, StreamEvent,
+    ApiErrorResponse, ContentBlock, CountTokensRequest, CountTokensResponse, Message,
+    MessageContent, MessagesRequest, MessagesResponse, ModelListResponse, Role, StreamEvent,
+    SystemPrompt, TextBlock, TypedContentBlock,
 };
 
 /// Anthropic API client.
@@ -66,7 +67,9 @@ impl Client {
         &self,
         req: &MessagesRequest,
     ) -> Result<ApiResponse<MessagesResponse>, Error> {
-        self.post_json("/v1/messages", req).await
+        let mut req = req.clone();
+        normalize_inline_system_messages(&mut req.messages, &mut req.system)?;
+        self.post_json("/v1/messages", &req).await
     }
 
     /// Send a streaming messages request, returning a stream of events.
@@ -77,7 +80,9 @@ impl Client {
         &self,
         req: &MessagesRequest,
     ) -> Result<ApiResponse<impl Stream<Item = Result<StreamEvent, Error>> + Send>, Error> {
-        let response = self.send_post("/v1/messages", req).await?;
+        let mut req = req.clone();
+        normalize_inline_system_messages(&mut req.messages, &mut req.system)?;
+        let response = self.send_post("/v1/messages", &req).await?;
 
         let rate_limit = RateLimitInfo::from_headers(response.headers());
 
@@ -98,7 +103,9 @@ impl Client {
         &self,
         req: &CountTokensRequest,
     ) -> Result<ApiResponse<CountTokensResponse>, Error> {
-        self.post_json("/v1/messages/count_tokens", req).await
+        let mut req = req.clone();
+        normalize_inline_system_messages(&mut req.messages, &mut req.system)?;
+        self.post_json("/v1/messages/count_tokens", &req).await
     }
 
     /// List available models.
@@ -219,6 +226,71 @@ impl Client {
     }
 }
 
+fn normalize_inline_system_messages(
+    messages: &mut Vec<Message>,
+    system: &mut Option<SystemPrompt>,
+) -> Result<(), Error> {
+    let mut conversation = Vec::with_capacity(messages.len());
+    let mut inline_system = Vec::new();
+    let mut found_inline_system = false;
+
+    for message in std::mem::take(messages) {
+        if message.role != Role::System {
+            conversation.push(message);
+            continue;
+        }
+
+        found_inline_system = true;
+        match message.content {
+            MessageContent::Text(text) => inline_system.push(TextBlock {
+                r#type: "text".to_owned(),
+                text,
+                cache_control: None,
+            }),
+            MessageContent::Blocks(blocks) => {
+                for block in blocks {
+                    match block {
+                        ContentBlock::Typed(TypedContentBlock::Text {
+                            text,
+                            cache_control,
+                        }) => inline_system.push(TextBlock {
+                            r#type: "text".to_owned(),
+                            text,
+                            cache_control,
+                        }),
+                        _ => {
+                            return Err(Error::Json(
+                                <serde_json::Error as serde::ser::Error>::custom(
+                                    "inline system messages may only contain text blocks",
+                                ),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    *messages = conversation;
+    if !found_inline_system {
+        return Ok(());
+    }
+
+    let mut system_blocks = match system.take() {
+        Some(SystemPrompt::Text(text)) => vec![TextBlock {
+            r#type: "text".to_owned(),
+            text,
+            cache_control: None,
+        }],
+        Some(SystemPrompt::Blocks(blocks)) => blocks,
+        None => Vec::new(),
+    };
+    system_blocks.extend(inline_system);
+    *system = Some(SystemPrompt::Blocks(system_blocks));
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use futures_util::StreamExt;
@@ -229,7 +301,10 @@ mod tests {
 
     use super::*;
     use crate::transport::TransportConfig;
-    use crate::types::{Message, MessageContent, MessagesRequest, Role};
+    use crate::types::{
+        ContentBlock, Message, MessageContent, MessagesRequest, Role, SystemPrompt,
+        TypedContentBlock,
+    };
 
     fn transport(base_url: String) -> Transport {
         Transport::new(TransportConfig {
@@ -310,6 +385,11 @@ mod tests {
         String::from_utf8(buf).unwrap()
     }
 
+    fn request_body_json(request: &str) -> serde_json::Value {
+        let (_, body) = request.split_once("\r\n\r\n").unwrap();
+        serde_json::from_str(body).unwrap()
+    }
+
     fn http_response(status: &str, content_type: &str, body: &str) -> String {
         format!(
             "HTTP/1.1 {status}\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
@@ -348,16 +428,64 @@ mod tests {
             spawn_server(http_response("200 OK", "application/json", body)).await;
         let client = Client::new(transport(base_url)).unwrap();
 
-        let resp = client.messages(&messages_request()).await.unwrap();
+        let mut req = messages_request();
+        req.system = Some(SystemPrompt::Text("top-level instructions".into()));
+        req.messages.insert(
+            0,
+            Message {
+                role: Role::System,
+                content: MessageContent::Blocks(vec![ContentBlock::Typed(
+                    TypedContentBlock::Text {
+                        text: "block instructions".into(),
+                        cache_control: None,
+                    },
+                )]),
+            },
+        );
+        req.messages.insert(
+            0,
+            Message {
+                role: Role::System,
+                content: MessageContent::Text("inline instructions".into()),
+            },
+        );
+
+        let resp = client.messages(&req).await.unwrap();
         assert_eq!(resp.body.id, "msg_01XFDUDYJgAACzvnptvVoYEL");
         assert_eq!(resp.body.usage.input_tokens, 10);
 
-        let raw = req_rx.await.unwrap().to_lowercase();
-        assert!(raw.contains("post /v1/messages http/1.1"));
-        assert!(raw.contains("x-api-key: sk-ant-test-key"));
-        assert!(raw.contains("anthropic-version: 2023-06-01"));
-        assert!(raw.contains("content-type: application/json"));
-        assert!(raw.contains("claude-sonnet-4-20250514"));
+        let raw = req_rx.await.unwrap();
+        let lowercase = raw.to_lowercase();
+        assert!(lowercase.contains("post /v1/messages http/1.1"));
+        assert!(lowercase.contains("x-api-key: sk-ant-test-key"));
+        assert!(lowercase.contains("anthropic-version: 2023-06-01"));
+        assert!(lowercase.contains("content-type: application/json"));
+        assert!(lowercase.contains("claude-sonnet-4-20250514"));
+
+        let sent = request_body_json(&raw);
+        assert_eq!(
+            sent["system"],
+            serde_json::json!([
+                { "type": "text", "text": "top-level instructions" },
+                { "type": "text", "text": "inline instructions" },
+                { "type": "text", "text": "block instructions" }
+            ])
+        );
+        assert_eq!(
+            sent["messages"],
+            serde_json::json!([{ "role": "user", "content": "Hello" }])
+        );
+    }
+
+    #[test]
+    fn inline_system_role_cannot_be_serialized_directly() {
+        let error = serde_json::to_value(Message {
+            role: Role::System,
+            content: MessageContent::Text("instructions".into()),
+        })
+        .unwrap_err();
+
+        assert!(error.to_string().contains("inbound-only"));
     }
 
     #[tokio::test]
@@ -415,17 +543,39 @@ mod tests {
 
         let req = crate::types::CountTokensRequest::builder()
             .model("claude-sonnet-4-20250514")
-            .messages(vec![Message {
-                role: Role::User,
-                content: MessageContent::Text("Hello".into()),
-            }])
+            .system(SystemPrompt::Text("top-level instructions".into()))
+            .messages(vec![
+                Message {
+                    role: Role::System,
+                    content: MessageContent::Text("inline instructions".into()),
+                },
+                Message {
+                    role: Role::User,
+                    content: MessageContent::Text("Hello".into()),
+                },
+            ])
             .build();
 
         let resp = client.count_tokens(&req).await.unwrap();
         assert_eq!(resp.body.input_tokens, 42);
 
-        let raw = req_rx.await.unwrap().to_lowercase();
-        assert!(raw.contains("post /v1/messages/count_tokens http/1.1"));
+        let raw = req_rx.await.unwrap();
+        assert!(
+            raw.to_lowercase()
+                .contains("post /v1/messages/count_tokens http/1.1")
+        );
+        let sent = request_body_json(&raw);
+        assert_eq!(
+            sent["system"],
+            serde_json::json!([
+                { "type": "text", "text": "top-level instructions" },
+                { "type": "text", "text": "inline instructions" }
+            ])
+        );
+        assert_eq!(
+            sent["messages"],
+            serde_json::json!([{ "role": "user", "content": "Hello" }])
+        );
     }
 
     #[tokio::test]
@@ -521,12 +671,19 @@ mod tests {
             "event: message_stop\n",
             "data: {\"type\":\"message_stop\"}\n\n",
         );
-        let (base_url, _) =
+        let (base_url, req_rx) =
             spawn_server(http_response("200 OK", "text/event-stream", events)).await;
         let client = Client::new(transport(base_url)).unwrap();
 
         let mut req = messages_request();
         req.stream = Some(true);
+        req.messages.insert(
+            0,
+            Message {
+                role: Role::System,
+                content: MessageContent::Text("streaming instructions".into()),
+            },
+        );
 
         let resp = client.messages_stream(&req).await.unwrap();
         assert_eq!(resp.rate_limit.requests_limit, None);
@@ -555,6 +712,16 @@ mod tests {
             }
             other => panic!("expected ContentBlockDelta, got: {other:?}"),
         }
+
+        let sent = request_body_json(&req_rx.await.unwrap());
+        assert_eq!(
+            sent["system"],
+            serde_json::json!([{ "type": "text", "text": "streaming instructions" }])
+        );
+        assert_eq!(
+            sent["messages"],
+            serde_json::json!([{ "role": "user", "content": "Hello" }])
+        );
     }
 
     #[tokio::test]

@@ -326,6 +326,8 @@ async fn inline_system_messages_reach_upstream_and_count_tokens() {
         .await
         .unwrap();
     assert_eq!(count_resp.status(), reqwest::StatusCode::OK);
+    let count: Value = count_resp.json().await.unwrap();
+    assert_eq!(count["input_tokens"], 16);
 
     let resp = client()
         .post(format!("{gateway}/v1/messages"))
