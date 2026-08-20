@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0](https://github.com/arcboxlabs/aigateway/compare/aigw-anthropic-v0.5.0...aigw-anthropic-v0.6.0) - 2026-08-20
+
+### Added
+- *(aigateway)* echo the requested Anthropic model in responses- *(aigateway)* openai-responses wire, richer stream usage, upstream proxy- *(aigw-anthropic)* add inbound native bridge
+
+### Fixed
+- *(aigateway)* accept inline system messages ([#7](https://github.com/arcboxlabs/aigateway/pull/7))- *(aigw-anthropic)* clean placeholder for image tool results
+
+### Build
+- switch reqwest from native-tls to rustls (webpki-roots)
+
 ## [0.5.0](https://github.com/arcboxlabs/aigateway/compare/aigw-anthropic-v0.4.0...aigw-anthropic-v0.5.0) - 2026-05-14
 
 ### Added

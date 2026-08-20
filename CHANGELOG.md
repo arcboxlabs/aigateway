@@ -1,6 +1,23 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.6.0](https://github.com/arcboxlabs/aigateway/compare/v0.5.0...v0.6.0) - 2026-08-20
+
+### Added
+- *(aigateway)* structured logging (tracing)- *(aigateway)* echo the requested Anthropic model in responses- *(aigateway)* expose upstream Quirks in config- *(aigateway)* keepalive ping during streaming- *(aigateway)* add /v1/models and /v1/messages/count_tokens- *(aigateway)* openai-responses wire, richer stream usage, upstream proxy- *(aigateway)* loopback Anthropic → OpenAI-compatible gateway server- *(aigw-anthropic)* add inbound native bridge
+
+### Fixed
+- *(aigateway)* accept inline system messages ([#7](https://github.com/arcboxlabs/aigateway/pull/7))- *(aigateway)* raise inbound body limit to 64 MiB- *(aigateway)* always terminate the Anthropic stream- *(aigw-anthropic)* clean placeholder for image tool results
+
+### Documentation
+- document the gateway sidecar spawn contract and config
+
+### Miscellaneous
+- build darwin-x64 on macos-14 (cross-compile)- build + publish per-platform binaries on release tags- add devenv development environment
+
+### Build
+- switch reqwest from native-tls to rustls (webpki-roots)
+
 ## [0.5.0](https://github.com/arcboxlabs/aigateway/compare/v0.4.0...v0.5.0) - 2026-05-14
 
 ### Added

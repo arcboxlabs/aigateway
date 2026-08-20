@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0](https://github.com/arcboxlabs/aigateway/compare/aigw-gemini-v0.5.0...aigw-gemini-v0.6.0) - 2026-08-20
+
+### Build
+- switch reqwest from native-tls to rustls (webpki-roots)
+
 ## [0.5.0](https://github.com/arcboxlabs/aigateway/compare/aigw-gemini-v0.4.0...aigw-gemini-v0.5.0) - 2026-05-14
 
 ### Added
